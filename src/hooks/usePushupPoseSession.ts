@@ -54,6 +54,7 @@ export function usePushupPoseSession({
     holdStart: null,
     samples: []
   });
+  const hasSeenCameraPreferenceRef = useRef(false);
   const startCameraRef = useRef<() => Promise<void>>(async () => {});
   const settingsRef = useRef(settings);
   const setActiveRef = useRef(setActive);
@@ -78,10 +79,15 @@ export function usePushupPoseSession({
   }, []);
 
   useEffect(() => {
-    if (viewState.isCameraRunning) {
+    if (!hasSeenCameraPreferenceRef.current) {
+      hasSeenCameraPreferenceRef.current = true;
+      return;
+    }
+
+    if (streamRef.current) {
       void startCameraRef.current();
     }
-  }, [settings.preferredCameraId, viewState.isCameraRunning]);
+  }, [settings.preferredCameraId]);
 
   async function ensurePoseLandmarker(): Promise<PoseLandmarker> {
     if (poseLandmarkerRef.current) {
