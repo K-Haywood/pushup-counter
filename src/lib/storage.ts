@@ -5,10 +5,17 @@ import type {
   DashboardSummary,
   DayRecord,
   HistoryPoint,
+  ProgressPeriodSummary,
+  ProgressSnapshot,
   SetRecord,
   StoredAppState,
   StreakSnapshot
 } from '../types/app';
+
+const INDEXED_DB_NAME = 'pushup-counter-db';
+const INDEXED_DB_VERSION = 1;
+const INDEXED_DB_STORE = 'app-state';
+const INDEXED_DB_RECORD_ID = 'current';
 
 function generateId(prefix: string): string {
   return `${prefix}-${crypto.randomUUID()}`;
@@ -20,6 +27,22 @@ function ensureNumber(value: unknown, fallback: number): number {
 
 function ensureBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function openStorageDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = window.indexedDB.open(INDEXED_DB_NAME, INDEXED_DB_VERSION);
+
+    request.onupgradeneeded = () => {
+      const database = request.result;
+      if (!database.objectStoreNames.contains(INDEXED_DB_STORE)) {
+        database.createObjectStore(INDEXED_DB_STORE);
+      }
+    };
+
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('Failed to open IndexedDB.'));
+  });
 }
 
 function migrateLegacyNumberSetting(
@@ -171,6 +194,85 @@ export function saveStoredState(storageKey: string, state: StoredAppState): void
   window.localStorage.setItem(storageKey, JSON.stringify(state));
 }
 
+export async function loadStoredStateFromIndexedDb(): Promise<StoredAppState | null> {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) {
+    return null;
+  }
+
+  const database = await openStorageDatabase();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction(INDEXED_DB_STORE, 'readonly');
+    const store = transaction.objectStore(INDEXED_DB_STORE);
+    const request = store.get(INDEXED_DB_RECORD_ID);
+
+    request.onsuccess = () => {
+      const rawState = request.result;
+      database.close();
+
+      if (!rawState || typeof rawState.payload !== 'string') {
+        resolve(null);
+        return;
+      }
+
+      try {
+        window.localStorage.setItem('pushup-counter:indexeddb-import', rawState.payload);
+        resolve(loadStoredState('pushup-counter:indexeddb-import'));
+        window.localStorage.removeItem('pushup-counter:indexeddb-import');
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    request.onerror = () => {
+      database.close();
+      reject(request.error ?? new Error('Failed to read IndexedDB state.'));
+    };
+  });
+}
+
+export async function saveStoredStateToIndexedDb(state: StoredAppState): Promise<void> {
+  if (typeof window === 'undefined' || !('indexedDB' in window)) {
+    return;
+  }
+
+  const database = await openStorageDatabase();
+
+  await new Promise<void>((resolve, reject) => {
+    const transaction = database.transaction(INDEXED_DB_STORE, 'readwrite');
+    const store = transaction.objectStore(INDEXED_DB_STORE);
+    store.put(
+      {
+        id: INDEXED_DB_RECORD_ID,
+        payload: JSON.stringify(state),
+        savedAt: new Date().toISOString()
+      },
+      INDEXED_DB_RECORD_ID
+    );
+
+    transaction.oncomplete = () => {
+      database.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      database.close();
+      reject(transaction.error ?? new Error('Failed to save IndexedDB state.'));
+    };
+  });
+}
+
+export function getLatestUpdatedAt(state: StoredAppState): string | null {
+  const timestamps = Object.values(state.days)
+    .map((day) => Date.parse(day.updatedAt))
+    .filter((value) => Number.isFinite(value));
+
+  if (timestamps.length === 0) {
+    return null;
+  }
+
+  return new Date(Math.max(...timestamps)).toISOString();
+}
+
 export function ensureDayRecord(state: StoredAppState, dateKey = getLocalDateKey()): DayRecord {
   if (!state.days[dateKey]) {
     state.days[dateKey] = {
@@ -199,6 +301,37 @@ function qualifiesForStreak(day: DayRecord | undefined): boolean {
   }
 
   return day.totalReps >= day.dailyGoal && day.dailyGoal > 0;
+}
+
+function countMeaningfulSets(day: DayRecord): number {
+  return day.sets.filter((set) => set.reps > 0 || set.autoCountedReps > 0 || Boolean(set.endedAt)).length;
+}
+
+function summarizePeriod(days: DayRecord[]): ProgressPeriodSummary {
+  const totalReps = days.reduce((sum, day) => sum + day.totalReps, 0);
+  const totalSets = days.reduce((sum, day) => sum + countMeaningfulSets(day), 0);
+  const activeDays = days.filter((day) => day.totalReps > 0).length;
+  const goalDays = days.filter((day) => qualifiesForStreak(day)).length;
+
+  return {
+    totalReps,
+    totalSets,
+    activeDays,
+    goalDays,
+    averagePerDay: days.length > 0 ? totalReps / days.length : 0
+  };
+}
+
+function getExistingOrEmptyDay(state: StoredAppState, dateKey: string): DayRecord {
+  return (
+    state.days[dateKey] ?? {
+      date: dateKey,
+      dailyGoal: state.settings.defaultDailyGoal,
+      totalReps: 0,
+      sets: [],
+      updatedAt: new Date(0).toISOString()
+    }
+  );
 }
 
 export function computeStreakSnapshot(days: Record<string, DayRecord>, todayKey = getLocalDateKey()): StreakSnapshot {
@@ -267,6 +400,36 @@ export function buildHistoryWindow(
       hitGoal: qualifiesForStreak(day)
     };
   });
+}
+
+export function buildProgressSnapshot(
+  state: StoredAppState,
+  today = new Date()
+): ProgressSnapshot {
+  const weekDays = listDateKeysBack(7, today).map((dateKey) => getExistingOrEmptyDay(state, dateKey));
+  const monthDays = listDateKeysBack(30, today).map((dateKey) => getExistingOrEmptyDay(state, dateKey));
+  const lifetimeDays = Object.values(state.days).sort((a, b) => a.date.localeCompare(b.date));
+  const bestDay = lifetimeDays.reduce<DayRecord | null>(
+    (currentBest, day) => {
+      if (!currentBest || day.totalReps > currentBest.totalReps) {
+        return day;
+      }
+
+      return currentBest;
+    },
+    null
+  );
+
+  return {
+    week: summarizePeriod(weekDays),
+    month: summarizePeriod(monthDays),
+    lifetime: {
+      ...summarizePeriod(lifetimeDays),
+      trackedDays: lifetimeDays.length,
+      bestDayDate: bestDay?.date ?? null,
+      bestDayReps: bestDay?.totalReps ?? 0
+    }
+  };
 }
 
 export function startSet(state: StoredAppState, dateKey = getLocalDateKey()): void {

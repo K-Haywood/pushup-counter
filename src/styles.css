@@ -609,6 +609,96 @@ button {
   font-size: 0.86rem;
 }
 
+.progress-hero {
+  display: grid;
+  gap: 1rem;
+}
+
+.progress-trio {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.progress-period {
+  padding: 1rem;
+  border-radius: 1.1rem;
+  border: 1px solid var(--border);
+  background: rgba(4, 12, 19, 0.72);
+}
+
+.progress-period--lime {
+  background: linear-gradient(180deg, rgba(19, 45, 32, 0.96), rgba(10, 22, 35, 0.88));
+}
+
+.progress-period--amber {
+  background: linear-gradient(180deg, rgba(60, 42, 11, 0.9), rgba(12, 20, 30, 0.88));
+}
+
+.progress-period__label,
+.progress-period__meta,
+.progress-summary__item span,
+.progress-storage__row span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.progress-period__label,
+.progress-period__meta {
+  display: block;
+}
+
+.progress-period__value {
+  display: block;
+  margin: 0.3rem 0 0.15rem;
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.progress-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+}
+
+.progress-summary__item {
+  padding: 0.85rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: rgba(4, 12, 19, 0.72);
+}
+
+.progress-summary__item span,
+.progress-summary__item strong {
+  display: block;
+}
+
+.progress-summary__item strong {
+  margin-top: 0.3rem;
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.progress-storage {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.progress-storage__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.progress-storage__row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
 .session-toolbar {
   display: flex;
   justify-content: space-between;
@@ -845,13 +935,20 @@ button {
     justify-content: flex-start;
   }
 
+  .progress-trio,
+  .progress-summary,
   .session-dock__summary,
   .diagnostic-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .session-dock__controls--main {
     grid-template-columns: minmax(0, 1.4fr) minmax(0, 0.8fr) minmax(0, 0.8fr);
+  }
+
+  .progress-storage__row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .screen-header h1,

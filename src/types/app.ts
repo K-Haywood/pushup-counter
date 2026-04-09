@@ -99,6 +99,24 @@ export interface HistoryPoint {
   hitGoal: boolean;
 }
 
+export interface ProgressPeriodSummary {
+  totalReps: number;
+  totalSets: number;
+  activeDays: number;
+  goalDays: number;
+  averagePerDay: number;
+}
+
+export interface ProgressSnapshot {
+  week: ProgressPeriodSummary;
+  month: ProgressPeriodSummary;
+  lifetime: ProgressPeriodSummary & {
+    trackedDays: number;
+    bestDayDate: string | null;
+    bestDayReps: number;
+  };
+}
+
 export interface CameraDeviceOption {
   deviceId: string;
   label: string;

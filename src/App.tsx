@@ -25,6 +25,9 @@ export default function App() {
     summary,
     last7Days,
     last30Days,
+    progress,
+    storageStatus,
+    lastSavedAt,
     startSet,
     endSet,
     addAutoRep,
@@ -135,7 +138,10 @@ export default function App() {
           <HistoryScreen
             last7Days={last7Days}
             last30Days={last30Days}
+            progress={progress}
             streakSnapshot={state.streakSnapshot}
+            storageStatus={storageStatus}
+            lastSavedAt={lastSavedAt}
           />
         ) : null}
 
