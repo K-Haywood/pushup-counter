@@ -213,7 +213,8 @@ export function analyzePoseFrame(
   const torsoHeight = distance(shoulderMid, hipMid);
   const shoulderWidth = distance(leftShoulder, rightShoulder);
   const hipWidth = distance(leftHip, rightHip);
-  const bodyScale = torsoHeight > 0.001 ? torsoHeight : shoulderWidth * 1.4;
+  const hipsReliable = hipsVisible >= Math.max(0.18, settings.minLandmarkVisibility - 0.2);
+  const bodyScale = hipsReliable && torsoHeight > 0.001 ? torsoHeight : shoulderWidth * 1.45;
   const upperBodyScale = Math.max(shoulderWidth, bodyScale * 0.72, 0.001);
   const shoulderWidthRatio = bodyScale === 0 ? 0 : shoulderWidth / bodyScale;
   const hipWidthRatio = bodyScale === 0 ? 0 : hipWidth / bodyScale;
@@ -263,10 +264,10 @@ export function analyzePoseFrame(
   const calibrationScale = calibration && bodyScale > 0 ? bodyScale / calibration.bodyScale : 1;
   const calibrationOkay =
     !calibration ||
-    ((calibrationScale >= 0.55 && calibrationScale <= 1.75) ||
+    ((!hipsReliable || (calibrationScale >= 0.48 && calibrationScale <= 2.05)) ||
       shouldersVisible < settings.minLandmarkVisibility) &&
-      shoulderWidthRatio >= calibration.shoulderWidthRatio * 0.4 &&
-      shoulderWidthRatio <= calibration.shoulderWidthRatio * 1.95;
+      shoulderWidthRatio >= calibration.shoulderWidthRatio * 0.34 &&
+      shoulderWidthRatio <= calibration.shoulderWidthRatio * 2.15;
 
   const visibilityScore = clamp(
     (visibilityRaw - settings.minLandmarkVisibility) /
