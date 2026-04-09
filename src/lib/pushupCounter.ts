@@ -14,6 +14,15 @@ type Landmark = {
   visibility?: number;
 };
 
+type ArmMetrics = {
+  side: BodySide;
+  visibilityScore: number;
+  elbowAngle: number;
+  shoulder: Landmark;
+  elbow: Landmark;
+  wrist: Landmark;
+};
+
 const LEFT = {
   shoulder: 11,
   elbow: 13,
@@ -28,10 +37,11 @@ const RIGHT = {
   hip: 24
 } as const;
 
-const FRONTAL_POINTS = [11, 12, 13, 14, 15, 16, 23, 24];
-const PHASE_HOLD_MS = 120;
-const PHASE_HYSTERESIS = 8;
-const DIRECTION_EPSILON = 1.5;
+const ESSENTIAL_FRONTAL_POINTS = [11, 12, 13, 14, 15, 16];
+const OPTIONAL_FRONTAL_POINTS = [23, 24];
+const PHASE_HOLD_MS = 90;
+const PHASE_HYSTERESIS = 6;
+const DIRECTION_EPSILON = 0.75;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -43,6 +53,20 @@ function average(values: number[]): number {
   }
 
   return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function weightedAverage(entries: Array<{ value: number; weight: number }>): number {
+  const valid = entries.filter((entry) => Number.isFinite(entry.value) && entry.weight > 0);
+  if (valid.length === 0) {
+    return 0;
+  }
+
+  const weightSum = valid.reduce((sum, entry) => sum + entry.weight, 0);
+  if (weightSum === 0) {
+    return average(valid.map((entry) => entry.value));
+  }
+
+  return valid.reduce((sum, entry) => sum + entry.value * entry.weight, 0) / weightSum;
 }
 
 function distance(a: Landmark, b: Landmark): number {
@@ -62,6 +86,10 @@ function visibility(point: Landmark | undefined): number {
   return point?.visibility ?? 0;
 }
 
+function normalizedDifference(a: number, b: number, scale: number): number {
+  return Math.abs(a - b) / Math.max(scale, 0.001);
+}
+
 function angleAtVertex(a: Landmark, b: Landmark, c: Landmark): number {
   const abX = a.x - b.x;
   const abY = a.y - b.y;
@@ -78,32 +106,41 @@ function angleAtVertex(a: Landmark, b: Landmark, c: Landmark): number {
   return (Math.acos(value) * 180) / Math.PI;
 }
 
-function getArmMetrics(landmarks: Landmark[], side: BodySide) {
+function getArmMetrics(landmarks: Landmark[], side: BodySide): ArmMetrics {
   const ids = side === 'left' ? LEFT : RIGHT;
   const shoulder = landmarks[ids.shoulder];
   const elbow = landmarks[ids.elbow];
   const wrist = landmarks[ids.wrist];
 
-  const visibilityScore = average([
-    visibility(shoulder),
-    visibility(elbow),
-    visibility(wrist)
-  ]);
-
   return {
     side,
-    visibilityScore,
+    shoulder,
+    elbow,
+    wrist,
+    visibilityScore: average([visibility(shoulder), visibility(elbow), visibility(wrist)]),
     elbowAngle: angleAtVertex(shoulder, elbow, wrist)
   };
 }
 
 function isFramedWell(landmarks: Landmark[]): boolean {
-  const relevant = FRONTAL_POINTS.map((index) => landmarks[index]);
+  const essential = ESSENTIAL_FRONTAL_POINTS
+    .map((index) => landmarks[index])
+    .filter((point) => visibility(point) > 0.2);
+  const optional = OPTIONAL_FRONTAL_POINTS
+    .map((index) => landmarks[index])
+    .filter((point) => visibility(point) > 0.15);
+  const relevant = [...essential, ...optional];
+
+  if (essential.length < 5 || relevant.length === 0) {
+    return false;
+  }
+
   const minX = Math.min(...relevant.map((point) => point.x));
   const maxX = Math.max(...relevant.map((point) => point.x));
   const minY = Math.min(...relevant.map((point) => point.y));
   const maxY = Math.max(...relevant.map((point) => point.y));
-  return minX > 0.04 && maxX < 0.96 && minY > 0.03 && maxY < 0.97;
+
+  return minX > 0.02 && maxX < 0.98 && minY > 0.02 && maxY < 0.99;
 }
 
 function getConfidenceLabel(confidence: number): 'high' | 'medium' | 'low' {
@@ -111,7 +148,7 @@ function getConfidenceLabel(confidence: number): 'high' | 'medium' | 'low' {
     return 'high';
   }
 
-  if (confidence >= 0.6) {
+  if (confidence >= 0.58) {
     return 'medium';
   }
 
@@ -147,99 +184,100 @@ export function analyzePoseFrame(
       confidence: 0,
       confidenceLabel: 'low',
       status: 'no-person',
-      guidance: 'No person detected. Move fully into frame.',
+      guidance: 'No person detected. Move into frame and face the camera.',
       countingReady: false
     };
   }
 
   const leftArm = getArmMetrics(landmarks, 'left');
   const rightArm = getArmMetrics(landmarks, 'right');
-  const selectedSide = leftArm.visibilityScore >= rightArm.visibilityScore ? 'left' : 'right';
+  const primaryArm = leftArm.visibilityScore >= rightArm.visibilityScore ? leftArm : rightArm;
+  const secondaryArm = primaryArm.side === 'left' ? rightArm : leftArm;
+  const selectedSide = primaryArm.side;
+  const secondaryArmUsable =
+    secondaryArm.visibilityScore >= Math.max(0.35, settings.minLandmarkVisibility - 0.15);
 
   const leftShoulder = landmarks[LEFT.shoulder];
   const rightShoulder = landmarks[RIGHT.shoulder];
-  const leftWrist = landmarks[LEFT.wrist];
-  const rightWrist = landmarks[RIGHT.wrist];
   const leftHip = landmarks[LEFT.hip];
   const rightHip = landmarks[RIGHT.hip];
 
   const shoulderMid = midpoint(leftShoulder, rightShoulder);
   const hipMid = midpoint(leftHip, rightHip);
-  const wristMid = midpoint(leftWrist, rightWrist);
 
+  const shouldersVisible = average([visibility(leftShoulder), visibility(rightShoulder)]);
+  const hipsVisible = average([visibility(leftHip), visibility(rightHip)]);
   const torsoHeight = distance(shoulderMid, hipMid);
   const shoulderWidth = distance(leftShoulder, rightShoulder);
   const hipWidth = distance(leftHip, rightHip);
+  const bodyScale = torsoHeight > 0.001 ? torsoHeight : shoulderWidth * 1.4;
+  const shoulderWidthRatio = bodyScale === 0 ? 0 : shoulderWidth / bodyScale;
+  const hipWidthRatio = bodyScale === 0 ? 0 : hipWidth / bodyScale;
 
-  const shoulderWidthRatio = torsoHeight === 0 ? 0 : shoulderWidth / torsoHeight;
-  const hipWidthRatio = torsoHeight === 0 ? 0 : hipWidth / torsoHeight;
-  const armSymmetryError = Math.abs(leftArm.elbowAngle - rightArm.elbowAngle) / 180;
-  const shoulderLevelError = shoulderWidth === 0 ? 1 : Math.abs(leftShoulder.y - rightShoulder.y) / shoulderWidth;
-  const hipLevelError = hipWidth === 0 ? 1 : Math.abs(leftHip.y - rightHip.y) / hipWidth;
-  const centerLineError = torsoHeight === 0 ? 1 : Math.abs(shoulderMid.x - hipMid.x) / torsoHeight;
-  const wristCenterError = torsoHeight === 0 ? 1 : Math.abs(wristMid.x - shoulderMid.x) / torsoHeight;
+  const weightedElbowAngle = weightedAverage([
+    { value: primaryArm.elbowAngle, weight: Math.max(primaryArm.visibilityScore, 0.01) },
+    ...(secondaryArmUsable
+      ? [{ value: secondaryArm.elbowAngle, weight: Math.max(secondaryArm.visibilityScore * 0.65, 0.01) }]
+      : [])
+  ]);
+
+  const armSymmetryError = secondaryArmUsable
+    ? Math.abs(leftArm.elbowAngle - rightArm.elbowAngle) / 180
+    : 0;
+  const shoulderLevelError = normalizedDifference(leftShoulder.y, rightShoulder.y, shoulderWidth);
+  const hipLevelError = hipsVisible > 0.25 ? normalizedDifference(leftHip.y, rightHip.y, hipWidth) : 0;
+  const centerLineError = hipsVisible > 0.25 ? normalizedDifference(shoulderMid.x, hipMid.x, bodyScale) : 0;
   const alignmentError = average([
     shoulderLevelError,
-    hipLevelError,
-    centerLineError,
-    wristCenterError,
-    armSymmetryError
+    ...(hipsVisible > 0.25 ? [hipLevelError, centerLineError] : []),
+    ...(secondaryArmUsable ? [armSymmetryError * 0.65] : [])
   ]);
 
   const framedWell = isFramedWell(landmarks);
-  const frontFacingEnough =
-    shoulderWidthRatio >= settings.frontViewMinRatio &&
-    hipWidthRatio >= settings.frontViewMinRatio * 0.55;
-  const symmetryGood = armSymmetryError <= settings.armSymmetryTolerance;
-  const alignmentGood = alignmentError <= settings.bodyAlignmentTolerance;
-  const averageElbowAngle = average([leftArm.elbowAngle, rightArm.elbowAngle]);
-  const visibilityRaw = average([
-    leftArm.visibilityScore,
-    rightArm.visibilityScore,
-    visibility(leftHip),
-    visibility(rightHip)
+  const frontFacingEnough = shoulderWidthRatio >= settings.frontViewMinRatio * 0.72;
+  const symmetryGood = !secondaryArmUsable || armSymmetryError <= settings.armSymmetryTolerance * 1.5;
+  const alignmentGood = alignmentError <= settings.bodyAlignmentTolerance * 1.3;
+  const visibilityRaw = weightedAverage([
+    { value: primaryArm.visibilityScore, weight: 0.45 },
+    { value: shouldersVisible, weight: 0.3 },
+    { value: secondaryArmUsable ? secondaryArm.visibilityScore : primaryArm.visibilityScore, weight: 0.15 },
+    { value: hipsVisible > 0.2 ? hipsVisible : primaryArm.visibilityScore, weight: 0.1 }
   ]);
 
-  const calibrationScale =
-    calibration && torsoHeight > 0 ? torsoHeight / calibration.bodyScale : 1;
+  const calibrationScale = calibration && bodyScale > 0 ? bodyScale / calibration.bodyScale : 1;
   const calibrationOkay =
     !calibration ||
-    (calibrationScale >= 0.7 &&
-      calibrationScale <= 1.35 &&
-      shoulderWidthRatio >= calibration.shoulderWidthRatio * 0.55 &&
-      shoulderWidthRatio <= calibration.shoulderWidthRatio * 1.5);
+    ((calibrationScale >= 0.55 && calibrationScale <= 1.75) ||
+      shouldersVisible < settings.minLandmarkVisibility) &&
+      shoulderWidthRatio >= calibration.shoulderWidthRatio * 0.4 &&
+      shoulderWidthRatio <= calibration.shoulderWidthRatio * 1.95;
 
   const visibilityScore = clamp(
     (visibilityRaw - settings.minLandmarkVisibility) /
-      (1 - settings.minLandmarkVisibility || 1),
+      Math.max(1 - settings.minLandmarkVisibility, 0.001),
     0,
     1
   );
   const alignmentScore = clamp(
-    1 - alignmentError / Math.max(settings.bodyAlignmentTolerance, 0.001),
+    1 - alignmentError / Math.max(settings.bodyAlignmentTolerance * 1.3, 0.001),
     0,
     1
   );
   const frontViewScore = clamp(
-    Math.min(
-      shoulderWidthRatio / Math.max(settings.frontViewMinRatio, 0.001),
-      hipWidthRatio / Math.max(settings.frontViewMinRatio * 0.55, 0.001)
-    ),
+    shoulderWidthRatio / Math.max(settings.frontViewMinRatio * 0.72, 0.001),
     0,
     1
   );
-  const symmetryScore = clamp(
-    1 - armSymmetryError / Math.max(settings.armSymmetryTolerance, 0.001),
-    0,
-    1
-  );
-  const framingScore = framedWell ? 1 : 0.25;
+  const symmetryScore = secondaryArmUsable
+    ? clamp(1 - armSymmetryError / Math.max(settings.armSymmetryTolerance * 1.5, 0.001), 0, 1)
+    : 0.78;
+  const framingScore = framedWell ? 1 : 0.2;
 
   const confidence = clamp(
-    visibilityScore * 0.38 +
-      alignmentScore * 0.22 +
+    visibilityScore * 0.47 +
+      alignmentScore * 0.18 +
       frontViewScore * 0.2 +
-      symmetryScore * 0.15 +
+      symmetryScore * 0.1 +
       framingScore * 0.05,
     0,
     1
@@ -247,33 +285,33 @@ export function analyzePoseFrame(
 
   let status: PoseFrameMetrics['status'] = 'ready';
   let guidance = calibration
-    ? 'Front-on view locked. Ready to count.'
-    : 'Front-on view locked. Calibrate from the top position.';
+    ? 'Front-on view locked. Start counting when ready.'
+    : 'Front-on view locked. Hold the top position to calibrate.';
 
   if (visibilityRaw < settings.minLandmarkVisibility) {
     status = 'low-confidence';
-    guidance = 'Low confidence. Improve lighting and keep both elbows and wrists visible.';
+    guidance = 'Improve lighting and keep both elbows and wrists visible.';
   } else if (!framedWell) {
     status = 'bad-angle';
-    guidance = 'Keep shoulders, elbows, wrists, and hips inside the frame.';
+    guidance = 'Keep your upper body inside the frame and leave some margin around your arms.';
   } else if (!frontFacingEnough) {
     status = 'bad-angle';
-    guidance = 'Face the camera directly so both shoulders and hips stay wide in frame.';
+    guidance = 'Face the camera directly and move slightly closer if your shoulders look narrow.';
   } else if (!symmetryGood) {
     status = 'bad-angle';
-    guidance = 'Keep both arms visible and moving evenly together.';
+    guidance = 'Try to keep both elbows visible, but the app can still count from the clearer arm.';
   } else if (!alignmentGood) {
     status = 'bad-angle';
-    guidance = 'Square your shoulders and hips to the camera.';
+    guidance = 'Square your shoulders to the camera and avoid leaning to one side.';
   } else if (!calibrationOkay) {
     status = 'bad-angle';
-    guidance = 'Match your calibration distance before counting reps.';
+    guidance = 'Return to roughly the same distance you used during calibration.';
   }
 
   return {
     side: selectedSide,
-    elbowAngle: averageElbowAngle,
-    bodyScale: torsoHeight,
+    elbowAngle: weightedElbowAngle,
+    bodyScale,
     shoulderWidthRatio,
     hipWidthRatio,
     alignmentError,

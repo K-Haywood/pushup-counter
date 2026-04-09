@@ -13,7 +13,7 @@ interface CameraScreenProps {
   videoRef: React.RefObject<HTMLVideoElement | null>;
   overlayRef: React.RefObject<HTMLCanvasElement | null>;
   onToggleCamera: () => void;
-  onStartSet: () => void;
+  onStartWorkout: () => void | Promise<void>;
   onEndSet: () => void;
   onCalibrate: () => void;
   onFlipCamera: () => void;
@@ -37,7 +37,7 @@ export function CameraScreen({
   videoRef,
   overlayRef,
   onToggleCamera,
-  onStartSet,
+  onStartWorkout,
   onEndSet,
   onCalibrate,
   onFlipCamera,
@@ -63,6 +63,12 @@ export function CameraScreen({
             <p className={`status-pill status-pill--${viewState.status}`}>{formatStatusLabel(viewState.status)}</p>
           </div>
 
+          <div className="camera-stage__counter">
+            <span className="camera-stage__counter-label">Current set</span>
+            <strong>{currentSet?.reps ?? 0}</strong>
+            <span className="camera-stage__counter-phase">{PHASE_LABELS[viewState.phase]}</span>
+          </div>
+
           <div className="camera-stage__footer">
             <span className="inline-badge">Sets {setsDoneToday}</span>
             <span className="inline-badge">Left {Math.max(0, repsRemaining)}</span>
@@ -70,129 +76,82 @@ export function CameraScreen({
           </div>
         </div>
 
-        <div className="camera-stage__meta">
+        <div className="camera-stage__meta camera-stage__meta--compact">
           <p className="camera-stage__guidance">{viewState.guidance}</p>
           {viewState.errorMessage ? <p className="camera-stage__error">{viewState.errorMessage}</p> : null}
+          {viewState.calibrationActive ? (
+            <div className="progress-track" aria-hidden="true">
+              <span
+                className="progress-track__fill"
+                style={{ width: `${Math.round(viewState.calibrationProgress * 100)}%` }}
+              />
+            </div>
+          ) : null}
         </div>
       </section>
 
-      <section className="panel panel--tight">
-        <div className="session-toolbar">
-          <div>
-            <p className="eyebrow">Session</p>
-            <h2>Ready for your next set</h2>
-          </div>
-          <span className="session-progress__chip">{Math.max(0, repsRemaining)} reps left</span>
-        </div>
-
-        <div className="progress-track" aria-hidden="true">
-          <span className="progress-track__fill" style={{ width: `${Math.round(goalProgress * 100)}%` }} />
-        </div>
-
-        <div className="session-metrics">
+      <section className="panel panel--tight session-dock">
+        <div className="session-dock__summary">
           <div className="session-metric">
-            <span className="session-metric__label">Sets done</span>
-            <strong>{setsDoneToday}</strong>
-          </div>
-          <div className="session-metric">
-            <span className="session-metric__label">Current set</span>
-            <strong>{currentSet?.reps ?? 0}</strong>
+            <span className="session-metric__label">Goal</span>
+            <strong>{Math.round(goalProgress * 100)}%</strong>
           </div>
           <div className="session-metric">
             <span className="session-metric__label">Camera</span>
             <strong>{viewState.isCameraRunning ? 'On' : 'Off'}</strong>
           </div>
+          <div className="session-metric">
+            <span className="session-metric__label">Confidence</span>
+            <strong>{Math.round(viewState.confidence * 100)}%</strong>
+          </div>
         </div>
 
-        <div className="button-grid button-grid--session">
+        <div className="session-dock__controls session-dock__controls--top">
           <button className="primary-button" type="button" onClick={onToggleCamera}>
             {viewState.isCameraRunning ? 'Stop camera' : 'Start camera'}
           </button>
           <button className="secondary-button" type="button" onClick={onFlipCamera}>
-            {currentFacingMode === 'environment' ? 'Use front camera' : 'Use rear camera'}
+            {currentFacingMode === 'environment' ? 'Front camera' : 'Rear camera'}
           </button>
         </div>
 
-        <div className="button-grid button-grid--session">
+        <div className="session-dock__controls session-dock__controls--main">
           {setActive ? (
-            <button className="accent-button" type="button" onClick={onEndSet}>
+            <button className="accent-button session-dock__primary-action" type="button" onClick={onEndSet}>
               End set
             </button>
           ) : (
-            <button
-              className="accent-button"
-              type="button"
-              onClick={onStartSet}
-              disabled={!viewState.isCameraRunning}
-            >
-              Start set
+            <button className="accent-button session-dock__primary-action" type="button" onClick={onStartWorkout}>
+              Start counting
             </button>
           )}
-          {viewState.isCameraRunning ? (
-            <button className="ghost-button" type="button" onClick={onCalibrate}>
-              {viewState.calibrationSnapshot ? 'Recalibrate' : 'Calibrate'}
-            </button>
-          ) : null}
+          <button
+            className="manual-button"
+            type="button"
+            onClick={() => onAdjustSet(1)}
+            disabled={!setActive}
+          >
+            +1
+          </button>
+          <button
+            className="manual-button"
+            type="button"
+            onClick={() => onAdjustSet(-1)}
+            disabled={!setActive}
+          >
+            -1
+          </button>
         </div>
 
-        {!viewState.isCameraRunning ? (
-          <p className="subtle-copy">
-            Place the phone low in front of you, then tap Start camera. Keep both arms and hips visible.
-          </p>
-        ) : null}
-
-        {setActive ? (
-          <div className="button-grid button-grid--compact-two">
-            <button className="manual-button" type="button" onClick={() => onAdjustSet(1)}>
-              +1 rep
-            </button>
-            <button className="manual-button" type="button" onClick={() => onAdjustSet(-1)}>
-              -1 rep
-            </button>
-          </div>
-        ) : null}
+        <div className="session-dock__footer">
+          <button className="text-button" type="button" onClick={onCalibrate}>
+            {viewState.calibrationSnapshot ? 'Recalibrate' : 'Calibrate top position'}
+          </button>
+          <span className="session-dock__footer-copy">
+            Place the phone low, front-on, and keep shoulders, elbows, wrists, and hips visible.
+          </span>
+        </div>
       </section>
-
-      {(viewState.calibrationActive || viewState.calibrationSnapshot) && viewState.isCameraRunning ? (
-        <section className="panel panel--tight calibration-panel">
-          <div className="panel__header">
-            <div>
-              <p className="eyebrow">Calibration</p>
-              <h2>Top-position check</h2>
-            </div>
-            <p className="calibration-panel__value">{Math.round(viewState.calibrationProgress * 100)}%</p>
-          </div>
-          <div className="progress-track" aria-hidden="true">
-            <span
-              className="progress-track__fill"
-              style={{ width: `${Math.round(viewState.calibrationProgress * 100)}%` }}
-            />
-          </div>
-          <p className="subtle-copy">
-            {viewState.calibrationSnapshot
-              ? 'Calibration is saved for this camera session.'
-              : 'Hold the top push-up position until the bar fills.'}
-          </p>
-        </section>
-      ) : null}
-
-      <details className="panel details-panel">
-        <summary>Tracking details</summary>
-        <div className="diagnostic-grid">
-          <div className="diagnostic-item">
-            <span>Phase</span>
-            <strong>{PHASE_LABELS[viewState.phase]}</strong>
-          </div>
-          <div className="diagnostic-item">
-            <span>Confidence</span>
-            <strong>{Math.round(viewState.confidence * 100)}%</strong>
-          </div>
-          <div className="diagnostic-item">
-            <span>Elbow angle</span>
-            <strong>{viewState.smoothedAngle ? `${Math.round(viewState.smoothedAngle)} deg` : '--'}</strong>
-          </div>
-        </div>
-      </details>
     </section>
   );
 }

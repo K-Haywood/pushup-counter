@@ -111,9 +111,9 @@ export function usePushupPoseSession({
       },
       runningMode: 'VIDEO',
       numPoses: 2,
-      minPoseDetectionConfidence: 0.6,
-      minPosePresenceConfidence: 0.6,
-      minTrackingConfidence: 0.6
+      minPoseDetectionConfidence: 0.5,
+      minPosePresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5
     });
 
     poseLandmarkerRef.current = poseLandmarker;
@@ -179,7 +179,7 @@ export function usePushupPoseSession({
         ...current,
         isCameraRunning: true,
         status: 'ready',
-        guidance: 'Camera running. Face the camera with both arms visible.',
+        guidance: 'Camera running. Face the camera and keep your shoulders and elbows visible.',
         errorMessage: null
       }));
 

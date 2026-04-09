@@ -107,7 +107,17 @@ export default function App() {
                 void poseSession.startCamera();
               }
             }}
-            onStartSet={startSet}
+            onStartWorkout={async () => {
+              if (!poseSession.viewState.isCameraRunning) {
+                await poseSession.startCamera();
+              }
+
+              if (!poseSession.viewState.calibrationSnapshot) {
+                poseSession.startCalibration();
+              }
+
+              startSet();
+            }}
             onEndSet={endSet}
             onCalibrate={poseSession.startCalibration}
             onFlipCamera={() =>

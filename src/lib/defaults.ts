@@ -7,7 +7,7 @@ import type {
 } from '../types/app';
 
 export const APP_STORAGE_KEY = 'pushup-counter:v1';
-export const APP_STATE_VERSION = 1;
+export const APP_STATE_VERSION = 2;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultDailyGoal: 100,
@@ -15,16 +15,16 @@ export const DEFAULT_SETTINGS: AppSettings = {
   vibrationEnabled: true,
   cameraFacingMode: 'environment',
   preferredCameraId: null,
-  smoothingFrames: 5,
-  topThreshold: 155,
-  bottomThreshold: 95,
-  minLandmarkVisibility: 0.65,
-  bodyAlignmentTolerance: 0.12,
+  smoothingFrames: 4,
+  topThreshold: 148,
+  bottomThreshold: 110,
+  minLandmarkVisibility: 0.5,
+  bodyAlignmentTolerance: 0.18,
   sideViewMaxRatio: 0.28,
-  frontViewMinRatio: 0.55,
-  armSymmetryTolerance: 0.14,
-  cooldownMs: 650,
-  calibrationHoldMs: 1200
+  frontViewMinRatio: 0.42,
+  armSymmetryTolerance: 0.28,
+  cooldownMs: 700,
+  calibrationHoldMs: 900
 };
 
 export const EMPTY_CAMERA_DEVICES: CameraDeviceOption[] = [];

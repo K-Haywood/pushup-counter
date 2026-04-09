@@ -22,6 +22,21 @@ function ensureBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
 }
 
+function migrateLegacyNumberSetting(
+  rawValue: unknown,
+  nextDefault: number,
+  legacyDefault: number,
+  parsedVersion: number
+): number {
+  const resolved = ensureNumber(rawValue, nextDefault);
+
+  if (parsedVersion < 2 && (rawValue == null || resolved === legacyDefault)) {
+    return nextDefault;
+  }
+
+  return resolved;
+}
+
 export function loadStoredState(storageKey: string): StoredAppState {
   if (typeof window === 'undefined') {
     return createEmptyStoredState();
@@ -35,6 +50,7 @@ export function loadStoredState(storageKey: string): StoredAppState {
   try {
     const parsed = JSON.parse(raw) as Partial<StoredAppState>;
     const base = createEmptyStoredState();
+    const parsedVersion = ensureNumber(parsed.version, APP_STATE_VERSION);
 
     const settings: AppSettings = {
       defaultDailyGoal: ensureNumber(parsed.settings?.defaultDailyGoal, DEFAULT_SETTINGS.defaultDailyGoal),
@@ -43,25 +59,61 @@ export function loadStoredState(storageKey: string): StoredAppState {
       cameraFacingMode: parsed.settings?.cameraFacingMode === 'user' ? 'user' : 'environment',
       preferredCameraId:
         typeof parsed.settings?.preferredCameraId === 'string' ? parsed.settings.preferredCameraId : null,
-      smoothingFrames: ensureNumber(parsed.settings?.smoothingFrames, DEFAULT_SETTINGS.smoothingFrames),
-      topThreshold: ensureNumber(parsed.settings?.topThreshold, DEFAULT_SETTINGS.topThreshold),
-      bottomThreshold: ensureNumber(parsed.settings?.bottomThreshold, DEFAULT_SETTINGS.bottomThreshold),
-      minLandmarkVisibility: ensureNumber(
-        parsed.settings?.minLandmarkVisibility,
-        DEFAULT_SETTINGS.minLandmarkVisibility
+      smoothingFrames: migrateLegacyNumberSetting(
+        parsed.settings?.smoothingFrames,
+        DEFAULT_SETTINGS.smoothingFrames,
+        5,
+        parsedVersion
       ),
-      bodyAlignmentTolerance: ensureNumber(
+      topThreshold: migrateLegacyNumberSetting(
+        parsed.settings?.topThreshold,
+        DEFAULT_SETTINGS.topThreshold,
+        155,
+        parsedVersion
+      ),
+      bottomThreshold: migrateLegacyNumberSetting(
+        parsed.settings?.bottomThreshold,
+        DEFAULT_SETTINGS.bottomThreshold,
+        95,
+        parsedVersion
+      ),
+      minLandmarkVisibility: migrateLegacyNumberSetting(
+        parsed.settings?.minLandmarkVisibility,
+        DEFAULT_SETTINGS.minLandmarkVisibility,
+        0.65,
+        parsedVersion
+      ),
+      bodyAlignmentTolerance: migrateLegacyNumberSetting(
         parsed.settings?.bodyAlignmentTolerance,
-        DEFAULT_SETTINGS.bodyAlignmentTolerance
+        DEFAULT_SETTINGS.bodyAlignmentTolerance,
+        0.12,
+        parsedVersion
       ),
       sideViewMaxRatio: ensureNumber(parsed.settings?.sideViewMaxRatio, DEFAULT_SETTINGS.sideViewMaxRatio),
-      frontViewMinRatio: ensureNumber(parsed.settings?.frontViewMinRatio, DEFAULT_SETTINGS.frontViewMinRatio),
-      armSymmetryTolerance: ensureNumber(
-        parsed.settings?.armSymmetryTolerance,
-        DEFAULT_SETTINGS.armSymmetryTolerance
+      frontViewMinRatio: migrateLegacyNumberSetting(
+        parsed.settings?.frontViewMinRatio,
+        DEFAULT_SETTINGS.frontViewMinRatio,
+        0.55,
+        parsedVersion
       ),
-      cooldownMs: ensureNumber(parsed.settings?.cooldownMs, DEFAULT_SETTINGS.cooldownMs),
-      calibrationHoldMs: ensureNumber(parsed.settings?.calibrationHoldMs, DEFAULT_SETTINGS.calibrationHoldMs)
+      armSymmetryTolerance: migrateLegacyNumberSetting(
+        parsed.settings?.armSymmetryTolerance,
+        DEFAULT_SETTINGS.armSymmetryTolerance,
+        0.14,
+        parsedVersion
+      ),
+      cooldownMs: migrateLegacyNumberSetting(
+        parsed.settings?.cooldownMs,
+        DEFAULT_SETTINGS.cooldownMs,
+        650,
+        parsedVersion
+      ),
+      calibrationHoldMs: migrateLegacyNumberSetting(
+        parsed.settings?.calibrationHoldMs,
+        DEFAULT_SETTINGS.calibrationHoldMs,
+        1200,
+        parsedVersion
+      )
     };
 
     const days = Object.fromEntries(
@@ -97,7 +149,7 @@ export function loadStoredState(storageKey: string): StoredAppState {
     );
 
     return {
-      version: ensureNumber(parsed.version, APP_STATE_VERSION),
+      version: APP_STATE_VERSION,
       settings,
       days,
       session: {
