@@ -179,7 +179,7 @@ export function usePushupPoseSession({
         ...current,
         isCameraRunning: true,
         status: 'ready',
-        guidance: 'Camera running. Face the camera and keep your shoulders and elbows visible.',
+        guidance: 'Camera running. Face the camera and keep your chest, elbows, and at least one wrist visible.',
         errorMessage: null
       }));
 

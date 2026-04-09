@@ -41,7 +41,7 @@ const ESSENTIAL_FRONTAL_POINTS = [11, 12, 13, 14, 15, 16];
 const OPTIONAL_FRONTAL_POINTS = [23, 24];
 const PHASE_HOLD_MS = 90;
 const PHASE_HYSTERESIS = 6;
-const DIRECTION_EPSILON = 0.75;
+const DIRECTION_EPSILON = 0.55;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -123,15 +123,18 @@ function getArmMetrics(landmarks: Landmark[], side: BodySide): ArmMetrics {
 }
 
 function isFramedWell(landmarks: Landmark[]): boolean {
+  const shoulderCount = [11, 12].filter((index) => visibility(landmarks[index]) > 0.18).length;
+  const elbowCount = [13, 14].filter((index) => visibility(landmarks[index]) > 0.18).length;
+  const wristCount = [15, 16].filter((index) => visibility(landmarks[index]) > 0.12).length;
   const essential = ESSENTIAL_FRONTAL_POINTS
     .map((index) => landmarks[index])
-    .filter((point) => visibility(point) > 0.2);
+    .filter((point) => visibility(point) > 0.12);
   const optional = OPTIONAL_FRONTAL_POINTS
     .map((index) => landmarks[index])
     .filter((point) => visibility(point) > 0.15);
   const relevant = [...essential, ...optional];
 
-  if (essential.length < 5 || relevant.length === 0) {
+  if (shoulderCount < 2 || elbowCount < 2 || wristCount < 1 || relevant.length === 0) {
     return false;
   }
 
@@ -140,7 +143,7 @@ function isFramedWell(landmarks: Landmark[]): boolean {
   const minY = Math.min(...relevant.map((point) => point.y));
   const maxY = Math.max(...relevant.map((point) => point.y));
 
-  return minX > 0.02 && maxX < 0.98 && minY > 0.02 && maxY < 0.99;
+  return minX > 0.01 && maxX < 0.99 && minY > 0.01 && maxY < 0.995;
 }
 
 function getConfidenceLabel(confidence: number): 'high' | 'medium' | 'low' {
@@ -195,7 +198,7 @@ export function analyzePoseFrame(
   const secondaryArm = primaryArm.side === 'left' ? rightArm : leftArm;
   const selectedSide = primaryArm.side;
   const secondaryArmUsable =
-    secondaryArm.visibilityScore >= Math.max(0.35, settings.minLandmarkVisibility - 0.15);
+    secondaryArm.visibilityScore >= Math.max(0.25, settings.minLandmarkVisibility - 0.2);
 
   const leftShoulder = landmarks[LEFT.shoulder];
   const rightShoulder = landmarks[RIGHT.shoulder];
@@ -224,9 +227,11 @@ export function analyzePoseFrame(
   ]);
   const reachDerivedAngle = clamp(42 + armVerticalSpanRatio * 76, 72, 170);
 
+  const reachWeight = primaryArm.visibilityScore < 0.55 ? 0.58 : 0.42;
+
   const weightedElbowAngle = weightedAverage([
     { value: primaryArm.elbowAngle, weight: Math.max(primaryArm.visibilityScore, 0.01) },
-    { value: reachDerivedAngle, weight: 0.36 },
+    { value: reachDerivedAngle, weight: reachWeight },
     ...(secondaryArmUsable
       ? [{ value: secondaryArm.elbowAngle, weight: Math.max(secondaryArm.visibilityScore * 0.65, 0.01) }]
       : [])
@@ -245,9 +250,9 @@ export function analyzePoseFrame(
   ]);
 
   const framedWell = isFramedWell(landmarks);
-  const frontFacingEnough = shoulderWidthRatio >= settings.frontViewMinRatio * 0.72;
+  const frontFacingEnough = shoulderWidthRatio >= settings.frontViewMinRatio * 0.64;
   const symmetryGood = !secondaryArmUsable || armSymmetryError <= settings.armSymmetryTolerance * 1.5;
-  const alignmentGood = alignmentError <= settings.bodyAlignmentTolerance * 1.3;
+  const alignmentGood = alignmentError <= settings.bodyAlignmentTolerance * 1.45;
   const visibilityRaw = weightedAverage([
     { value: primaryArm.visibilityScore, weight: 0.45 },
     { value: shouldersVisible, weight: 0.3 },
@@ -270,12 +275,12 @@ export function analyzePoseFrame(
     1
   );
   const alignmentScore = clamp(
-    1 - alignmentError / Math.max(settings.bodyAlignmentTolerance * 1.3, 0.001),
+    1 - alignmentError / Math.max(settings.bodyAlignmentTolerance * 1.45, 0.001),
     0,
     1
   );
   const frontViewScore = clamp(
-    shoulderWidthRatio / Math.max(settings.frontViewMinRatio * 0.72, 0.001),
+    shoulderWidthRatio / Math.max(settings.frontViewMinRatio * 0.64, 0.001),
     0,
     1
   );

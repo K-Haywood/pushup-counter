@@ -112,7 +112,6 @@ export default function App() {
             dailyGoal={today.dailyGoal}
             setsDoneToday={setsDoneToday}
             repsRemaining={summary.remaining}
-            streak={summary.streak}
             viewState={poseSession.viewState}
             videoRef={poseSession.videoRef}
             overlayRef={poseSession.overlayRef}
