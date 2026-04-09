@@ -64,6 +64,12 @@ button {
   margin-top: 0.15rem;
 }
 
+.update-banner__copy {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
 .update-banner__actions {
   display: flex;
   gap: 0.65rem;

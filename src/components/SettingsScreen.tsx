@@ -3,6 +3,7 @@ import type { AppSettings, CameraDeviceOption } from '../types/app';
 interface SettingsScreenProps {
   settings: AppSettings;
   cameras: CameraDeviceOption[];
+  buildLabel: string;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
 }
 
@@ -47,6 +48,7 @@ function SliderField({
 export function SettingsScreen({
   settings,
   cameras,
+  buildLabel,
   onUpdateSettings
 }: SettingsScreenProps) {
   return (
@@ -213,6 +215,11 @@ export function SettingsScreen({
             />
           </div>
         </details>
+      </section>
+
+      <section className="panel panel--tight">
+        <p className="eyebrow">App build</p>
+        <p className="subtle-copy">Installed build: {buildLabel}</p>
       </section>
     </section>
   );

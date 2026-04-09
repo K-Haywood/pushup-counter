@@ -11,6 +11,13 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('camera');
   const [updateRegistration, setUpdateRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const buildLabel = new Date(__APP_BUILD__).toLocaleString([], {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit'
+  });
   const {
     state,
     today,
@@ -66,6 +73,7 @@ export default function App() {
           <div>
             <p className="eyebrow">Update available</p>
             <strong className="update-banner__title">A newer version is ready to load.</strong>
+            <p className="update-banner__copy">Latest build: {buildLabel}</p>
           </div>
           <div className="update-banner__actions">
             <button className="secondary-button" type="button" onClick={() => setUpdateRegistration(null)}>
@@ -125,6 +133,7 @@ export default function App() {
           <SettingsScreen
             settings={state.settings}
             cameras={poseSession.cameraDevices}
+            buildLabel={buildLabel}
             onUpdateSettings={updateSettings}
           />
         ) : null}
