@@ -21,6 +21,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   minLandmarkVisibility: 0.65,
   bodyAlignmentTolerance: 0.12,
   sideViewMaxRatio: 0.28,
+  frontViewMinRatio: 0.55,
+  armSymmetryTolerance: 0.14,
   cooldownMs: 650,
   calibrationHoldMs: 1200
 };

@@ -168,7 +168,7 @@ export function SettingsScreen({
         />
 
         <SliderField
-          label="Body straightness tolerance"
+          label="Front-view alignment tolerance"
           min={0.05}
           max={0.2}
           step={0.01}
@@ -177,12 +177,21 @@ export function SettingsScreen({
         />
 
         <SliderField
-          label="Side-view max ratio"
-          min={0.18}
-          max={0.4}
+          label="Front-view shoulder width"
+          min={0.35}
+          max={0.85}
           step={0.01}
-          value={Number(settings.sideViewMaxRatio.toFixed(2))}
-          onChange={(nextValue) => onUpdateSettings({ sideViewMaxRatio: nextValue })}
+          value={Number(settings.frontViewMinRatio.toFixed(2))}
+          onChange={(nextValue) => onUpdateSettings({ frontViewMinRatio: nextValue })}
+        />
+
+        <SliderField
+          label="Arm symmetry tolerance"
+          min={0.05}
+          max={0.3}
+          step={0.01}
+          value={Number(settings.armSymmetryTolerance.toFixed(2))}
+          onChange={(nextValue) => onUpdateSettings({ armSymmetryTolerance: nextValue })}
         />
 
         <SliderField

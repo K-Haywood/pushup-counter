@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pushup-counter-v3';
+const CACHE_NAME = 'pushup-counter-v4';
 const APP_SHELL = [
   './',
   './index.html',
@@ -16,6 +16,8 @@ const APP_SHELL = [
   './vendor/mediapipe/wasm/vision_wasm_nosimd_internal.js',
   './vendor/mediapipe/wasm/vision_wasm_nosimd_internal.wasm'
 ];
+const INDEX_URL = new URL('./index.html', self.registration.scope).toString();
+const APP_SHELL_URLS = new Set(APP_SHELL.map((path) => new URL(path, self.registration.scope).toString()));
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
@@ -48,22 +50,16 @@ self.addEventListener('fetch', (event) => {
 
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      caches.match('./index.html').then((cached) => cached || fetch(event.request))
+      caches.match(INDEX_URL).then((cached) => cached || fetch(event.request))
     );
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      if (cached) {
-        return cached;
-      }
+  if (!APP_SHELL_URLS.has(event.request.url)) {
+    return;
+  }
 
-      return fetch(event.request).then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        return response;
-      });
-    })
+  event.respondWith(
+    caches.match(event.request).then((cached) => cached || fetch(event.request))
   );
 });

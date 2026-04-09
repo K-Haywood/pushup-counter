@@ -71,7 +71,7 @@ export function CameraScreen({
         <StatCard
           label="Elbow angle"
           value={viewState.smoothedAngle ? `${Math.round(viewState.smoothedAngle)} deg` : '--'}
-          helper={viewState.selectedSide ? `${viewState.selectedSide} side` : 'No side locked'}
+          helper={viewState.selectedSide ? 'both arms tracked' : 'No pose locked'}
         />
       </div>
 
@@ -143,9 +143,9 @@ export function CameraScreen({
         <p className="eyebrow">Placement</p>
         <h2>Best camera setup</h2>
         <ul className="instruction-list">
-          <li>Place the phone 2 to 3 meters away, low to the floor or on a stand.</li>
-          <li>Use side-on framing with shoulders, hips, knees, and ankles visible.</li>
-          <li>Keep strong lighting on your body so elbows and wrists are clear.</li>
+          <li>Place the phone directly in front of you, low to the floor or on a short stand.</li>
+          <li>Face the camera so both shoulders, elbows, wrists, and hips stay visible.</li>
+          <li>Keep strong lighting on your upper body so both elbows and wrists are clear.</li>
           <li>Only one person should be in frame while counting is active.</li>
           <li>Tap the flip button to swap between the front and rear cameras.</li>
         </ul>

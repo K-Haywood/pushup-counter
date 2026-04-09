@@ -179,7 +179,7 @@ export function usePushupPoseSession({
         ...current,
         isCameraRunning: true,
         status: 'ready',
-        guidance: 'Camera running. Side-on view works best for counting.',
+        guidance: 'Camera running. Face the camera with both arms visible.',
         errorMessage: null
       }));
 
@@ -346,7 +346,7 @@ export function usePushupPoseSession({
         ...current,
         calibrationActive: true,
         calibrationProgress: 0,
-        guidance: 'Hold the top push-up position with a clear side view.'
+        guidance: 'Hold the top push-up position while facing the camera.'
       }));
     }
   }
@@ -371,7 +371,7 @@ export function usePushupPoseSession({
         confidence: 0,
         confidenceLabel: 'low',
         status: 'no-person',
-        guidance: 'No person detected. Step back and frame your full body.',
+        guidance: 'No person detected. Frame your shoulders, elbows, wrists, and hips.',
         countingReady: false
       };
     } else if (result.landmarks.length > 1) {
@@ -441,7 +441,7 @@ export function usePushupPoseSession({
         ...current,
         calibrationActive: true,
         calibrationProgress: 0,
-        guidance: 'Hold the top push-up position until calibration finishes.'
+        guidance: 'Hold the top push-up position while facing the camera.'
       }));
     }
   };

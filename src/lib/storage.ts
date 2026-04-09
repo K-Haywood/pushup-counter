@@ -55,6 +55,11 @@ export function loadStoredState(storageKey: string): StoredAppState {
         DEFAULT_SETTINGS.bodyAlignmentTolerance
       ),
       sideViewMaxRatio: ensureNumber(parsed.settings?.sideViewMaxRatio, DEFAULT_SETTINGS.sideViewMaxRatio),
+      frontViewMinRatio: ensureNumber(parsed.settings?.frontViewMinRatio, DEFAULT_SETTINGS.frontViewMinRatio),
+      armSymmetryTolerance: ensureNumber(
+        parsed.settings?.armSymmetryTolerance,
+        DEFAULT_SETTINGS.armSymmetryTolerance
+      ),
       cooldownMs: ensureNumber(parsed.settings?.cooldownMs, DEFAULT_SETTINGS.cooldownMs),
       calibrationHoldMs: ensureNumber(parsed.settings?.calibrationHoldMs, DEFAULT_SETTINGS.calibrationHoldMs)
     };

@@ -98,8 +98,8 @@ export function HomeScreen({ summary, today, currentSet, onSaveGoal }: HomeScree
         <p className="eyebrow">How to use it</p>
         <h2>Quick setup for better counts</h2>
         <ul className="instruction-list">
-          <li>Place the phone 2 to 3 meters away with your full body visible.</li>
-          <li>Use a side-on profile so the elbow angle is easy to track.</li>
+          <li>Place the phone directly in front of you, low to the floor or on a short stand.</li>
+          <li>Face the camera so both shoulders, elbows, wrists, and hips are visible.</li>
           <li>Turn on the camera, calibrate at the top position, then start a set.</li>
           <li>Use +1 or -1 if the app needs a quick correction.</li>
         </ul>

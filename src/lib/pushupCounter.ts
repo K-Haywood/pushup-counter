@@ -18,21 +18,17 @@ const LEFT = {
   shoulder: 11,
   elbow: 13,
   wrist: 15,
-  hip: 23,
-  knee: 25,
-  ankle: 27
+  hip: 23
 } as const;
 
 const RIGHT = {
   shoulder: 12,
   elbow: 14,
   wrist: 16,
-  hip: 24,
-  knee: 26,
-  ankle: 28
+  hip: 24
 } as const;
 
-const FULL_BODY_POINTS = [11, 12, 23, 24, 25, 26, 27, 28];
+const FRONTAL_POINTS = [11, 12, 13, 14, 15, 16, 23, 24];
 const PHASE_HOLD_MS = 120;
 const PHASE_HYSTERESIS = 8;
 const DIRECTION_EPSILON = 1.5;
@@ -51,6 +47,15 @@ function average(values: number[]): number {
 
 function distance(a: Landmark, b: Landmark): number {
   return Math.hypot(a.x - b.x, a.y - b.y);
+}
+
+function midpoint(a: Landmark, b: Landmark): Landmark {
+  return {
+    x: (a.x + b.x) / 2,
+    y: (a.y + b.y) / 2,
+    z: (a.z + b.z) / 2,
+    visibility: average([a.visibility ?? 0, b.visibility ?? 0])
+  };
 }
 
 function visibility(point: Landmark | undefined): number {
@@ -73,59 +78,32 @@ function angleAtVertex(a: Landmark, b: Landmark, c: Landmark): number {
   return (Math.acos(value) * 180) / Math.PI;
 }
 
-function distanceToLine(point: Landmark, lineStart: Landmark, lineEnd: Landmark): number {
-  const numerator = Math.abs(
-    (lineEnd.y - lineStart.y) * point.x -
-      (lineEnd.x - lineStart.x) * point.y +
-      lineEnd.x * lineStart.y -
-      lineEnd.y * lineStart.x
-  );
-  const denominator = Math.hypot(lineEnd.y - lineStart.y, lineEnd.x - lineStart.x);
-
-  return denominator === 0 ? 0 : numerator / denominator;
-}
-
-function getSideMetrics(landmarks: Landmark[], side: BodySide) {
+function getArmMetrics(landmarks: Landmark[], side: BodySide) {
   const ids = side === 'left' ? LEFT : RIGHT;
   const shoulder = landmarks[ids.shoulder];
   const elbow = landmarks[ids.elbow];
   const wrist = landmarks[ids.wrist];
-  const hip = landmarks[ids.hip];
-  const knee = landmarks[ids.knee];
-  const ankle = landmarks[ids.ankle];
 
   const visibilityScore = average([
     visibility(shoulder),
     visibility(elbow),
-    visibility(wrist),
-    visibility(hip),
-    visibility(knee),
-    visibility(ankle)
-  ]);
-
-  const elbowAngle = angleAtVertex(shoulder, elbow, wrist);
-  const bodyScale = distance(shoulder, ankle);
-  const alignmentError = bodyScale === 0 ? 1 : average([
-    distanceToLine(hip, shoulder, ankle) / bodyScale,
-    distanceToLine(knee, shoulder, ankle) / bodyScale
+    visibility(wrist)
   ]);
 
   return {
     side,
     visibilityScore,
-    elbowAngle,
-    bodyScale,
-    alignmentError
+    elbowAngle: angleAtVertex(shoulder, elbow, wrist)
   };
 }
 
 function isFramedWell(landmarks: Landmark[]): boolean {
-  const relevant = FULL_BODY_POINTS.map((index) => landmarks[index]);
+  const relevant = FRONTAL_POINTS.map((index) => landmarks[index]);
   const minX = Math.min(...relevant.map((point) => point.x));
   const maxX = Math.max(...relevant.map((point) => point.x));
   const minY = Math.min(...relevant.map((point) => point.y));
   const maxY = Math.max(...relevant.map((point) => point.y));
-  return minX > 0.02 && maxX < 0.98 && minY > 0.02 && maxY < 0.98;
+  return minX > 0.04 && maxX < 0.96 && minY > 0.03 && maxY < 0.97;
 }
 
 function getConfidenceLabel(confidence: number): 'high' | 'medium' | 'low' {
@@ -174,88 +152,132 @@ export function analyzePoseFrame(
     };
   }
 
-  const preferredSide = calibration?.side;
-  const left = getSideMetrics(landmarks, 'left');
-  const right = getSideMetrics(landmarks, 'right');
+  const leftArm = getArmMetrics(landmarks, 'left');
+  const rightArm = getArmMetrics(landmarks, 'right');
+  const selectedSide = leftArm.visibilityScore >= rightArm.visibilityScore ? 'left' : 'right';
 
-  let selected = left.visibilityScore >= right.visibilityScore ? left : right;
-  if (preferredSide === 'left' && left.visibilityScore >= right.visibilityScore - 0.08) {
-    selected = left;
-  } else if (preferredSide === 'right' && right.visibilityScore >= left.visibilityScore - 0.08) {
-    selected = right;
-  }
+  const leftShoulder = landmarks[LEFT.shoulder];
+  const rightShoulder = landmarks[RIGHT.shoulder];
+  const leftWrist = landmarks[LEFT.wrist];
+  const rightWrist = landmarks[RIGHT.wrist];
+  const leftHip = landmarks[LEFT.hip];
+  const rightHip = landmarks[RIGHT.hip];
 
-  const shoulderWidthRatio =
-    selected.bodyScale === 0
-      ? 1
-      : distance(landmarks[LEFT.shoulder], landmarks[RIGHT.shoulder]) / selected.bodyScale;
-  const hipWidthRatio =
-    selected.bodyScale === 0
-      ? 1
-      : distance(landmarks[LEFT.hip], landmarks[RIGHT.hip]) / selected.bodyScale;
+  const shoulderMid = midpoint(leftShoulder, rightShoulder);
+  const hipMid = midpoint(leftHip, rightHip);
+  const wristMid = midpoint(leftWrist, rightWrist);
+
+  const torsoHeight = distance(shoulderMid, hipMid);
+  const shoulderWidth = distance(leftShoulder, rightShoulder);
+  const hipWidth = distance(leftHip, rightHip);
+
+  const shoulderWidthRatio = torsoHeight === 0 ? 0 : shoulderWidth / torsoHeight;
+  const hipWidthRatio = torsoHeight === 0 ? 0 : hipWidth / torsoHeight;
+  const armSymmetryError = Math.abs(leftArm.elbowAngle - rightArm.elbowAngle) / 180;
+  const shoulderLevelError = shoulderWidth === 0 ? 1 : Math.abs(leftShoulder.y - rightShoulder.y) / shoulderWidth;
+  const hipLevelError = hipWidth === 0 ? 1 : Math.abs(leftHip.y - rightHip.y) / hipWidth;
+  const centerLineError = torsoHeight === 0 ? 1 : Math.abs(shoulderMid.x - hipMid.x) / torsoHeight;
+  const wristCenterError = torsoHeight === 0 ? 1 : Math.abs(wristMid.x - shoulderMid.x) / torsoHeight;
+  const alignmentError = average([
+    shoulderLevelError,
+    hipLevelError,
+    centerLineError,
+    wristCenterError,
+    armSymmetryError
+  ]);
 
   const framedWell = isFramedWell(landmarks);
-  const sideOnEnough =
-    shoulderWidthRatio <= settings.sideViewMaxRatio && hipWidthRatio <= settings.sideViewMaxRatio;
-  const alignmentGood = selected.alignmentError <= settings.bodyAlignmentTolerance;
+  const frontFacingEnough =
+    shoulderWidthRatio >= settings.frontViewMinRatio &&
+    hipWidthRatio >= settings.frontViewMinRatio * 0.55;
+  const symmetryGood = armSymmetryError <= settings.armSymmetryTolerance;
+  const alignmentGood = alignmentError <= settings.bodyAlignmentTolerance;
+  const averageElbowAngle = average([leftArm.elbowAngle, rightArm.elbowAngle]);
+  const visibilityRaw = average([
+    leftArm.visibilityScore,
+    rightArm.visibilityScore,
+    visibility(leftHip),
+    visibility(rightHip)
+  ]);
+
   const calibrationScale =
-    calibration && selected.bodyScale > 0 ? selected.bodyScale / calibration.bodyScale : 1;
-  const calibrationOkay = !calibration || (calibrationScale >= 0.7 && calibrationScale <= 1.35);
+    calibration && torsoHeight > 0 ? torsoHeight / calibration.bodyScale : 1;
+  const calibrationOkay =
+    !calibration ||
+    (calibrationScale >= 0.7 &&
+      calibrationScale <= 1.35 &&
+      shoulderWidthRatio >= calibration.shoulderWidthRatio * 0.55 &&
+      shoulderWidthRatio <= calibration.shoulderWidthRatio * 1.5);
 
   const visibilityScore = clamp(
-    (selected.visibilityScore - settings.minLandmarkVisibility) /
+    (visibilityRaw - settings.minLandmarkVisibility) /
       (1 - settings.minLandmarkVisibility || 1),
     0,
     1
   );
   const alignmentScore = clamp(
-    1 - selected.alignmentError / Math.max(settings.bodyAlignmentTolerance, 0.001),
+    1 - alignmentError / Math.max(settings.bodyAlignmentTolerance, 0.001),
     0,
     1
   );
-  const sideViewScore = clamp(
-    1 - Math.max(shoulderWidthRatio, hipWidthRatio) / Math.max(settings.sideViewMaxRatio, 0.01),
+  const frontViewScore = clamp(
+    Math.min(
+      shoulderWidthRatio / Math.max(settings.frontViewMinRatio, 0.001),
+      hipWidthRatio / Math.max(settings.frontViewMinRatio * 0.55, 0.001)
+    ),
+    0,
+    1
+  );
+  const symmetryScore = clamp(
+    1 - armSymmetryError / Math.max(settings.armSymmetryTolerance, 0.001),
     0,
     1
   );
   const framingScore = framedWell ? 1 : 0.25;
 
   const confidence = clamp(
-    visibilityScore * 0.45 + alignmentScore * 0.25 + sideViewScore * 0.2 + framingScore * 0.1,
+    visibilityScore * 0.38 +
+      alignmentScore * 0.22 +
+      frontViewScore * 0.2 +
+      symmetryScore * 0.15 +
+      framingScore * 0.05,
     0,
     1
   );
 
   let status: PoseFrameMetrics['status'] = 'ready';
   let guidance = calibration
-    ? 'Aligned and ready to count.'
-    : 'Aligned and ready. Calibrate for tighter framing checks.';
+    ? 'Front-on view locked. Ready to count.'
+    : 'Front-on view locked. Calibrate from the top position.';
 
-  if (selected.visibilityScore < settings.minLandmarkVisibility) {
+  if (visibilityRaw < settings.minLandmarkVisibility) {
     status = 'low-confidence';
-    guidance = 'Low confidence. Improve lighting and keep elbows visible.';
+    guidance = 'Low confidence. Improve lighting and keep both elbows and wrists visible.';
   } else if (!framedWell) {
     status = 'bad-angle';
-    guidance = 'Keep your full body in frame from shoulders to ankles.';
-  } else if (!sideOnEnough) {
+    guidance = 'Keep shoulders, elbows, wrists, and hips inside the frame.';
+  } else if (!frontFacingEnough) {
     status = 'bad-angle';
-    guidance = 'Rotate to a side-on profile for cleaner elbow angles.';
+    guidance = 'Face the camera directly so both shoulders and hips stay wide in frame.';
+  } else if (!symmetryGood) {
+    status = 'bad-angle';
+    guidance = 'Keep both arms visible and moving evenly together.';
   } else if (!alignmentGood) {
     status = 'bad-angle';
-    guidance = 'Keep your body straighter from shoulder to ankle.';
+    guidance = 'Square your shoulders and hips to the camera.';
   } else if (!calibrationOkay) {
     status = 'bad-angle';
     guidance = 'Match your calibration distance before counting reps.';
   }
 
   return {
-    side: selected.side,
-    elbowAngle: selected.elbowAngle,
-    bodyScale: selected.bodyScale,
+    side: selectedSide,
+    elbowAngle: averageElbowAngle,
+    bodyScale: torsoHeight,
     shoulderWidthRatio,
     hipWidthRatio,
-    alignmentError: selected.alignmentError,
-    visibility: selected.visibilityScore,
+    alignmentError,
+    visibility: visibilityRaw,
     confidence,
     confidenceLabel: getConfidenceLabel(confidence),
     status,

@@ -29,6 +29,8 @@ export interface AppSettings {
   minLandmarkVisibility: number;
   bodyAlignmentTolerance: number;
   sideViewMaxRatio: number;
+  frontViewMinRatio: number;
+  armSymmetryTolerance: number;
   cooldownMs: number;
   calibrationHoldMs: number;
 }
