@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { BottomNav } from './components/BottomNav';
 import { CameraScreen } from './components/CameraScreen';
 import { HistoryScreen } from './components/HistoryScreen';
@@ -9,6 +9,8 @@ import type { AppTab } from './types/app';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('camera');
+  const [updateRegistration, setUpdateRegistration] = useState<ServiceWorkerRegistration | null>(null);
+  const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
   const {
     state,
     today,
@@ -31,8 +33,51 @@ export default function App() {
 
   const setsDoneToday = today.sets.filter((set) => set.reps > 0 || Boolean(set.endedAt)).length;
 
+  useEffect(() => {
+    const handleUpdateReady = (event: Event) => {
+      const customEvent = event as CustomEvent<{ registration: ServiceWorkerRegistration }>;
+      if (customEvent.detail?.registration) {
+        setUpdateRegistration(customEvent.detail.registration);
+        setIsApplyingUpdate(false);
+      }
+    };
+
+    window.addEventListener('pushup-counter:new-version-available', handleUpdateReady as EventListener);
+
+    return () => {
+      window.removeEventListener('pushup-counter:new-version-available', handleUpdateReady as EventListener);
+    };
+  }, []);
+
+  function applyUpdate() {
+    if (updateRegistration?.waiting) {
+      setIsApplyingUpdate(true);
+      updateRegistration.waiting.postMessage({ type: 'SKIP_WAITING' });
+      return;
+    }
+
+    window.location.reload();
+  }
+
   return (
     <div className="app-shell">
+      {updateRegistration ? (
+        <section className="update-banner" role="status" aria-live="polite">
+          <div>
+            <p className="eyebrow">Update available</p>
+            <strong className="update-banner__title">A newer version is ready to load.</strong>
+          </div>
+          <div className="update-banner__actions">
+            <button className="secondary-button" type="button" onClick={() => setUpdateRegistration(null)}>
+              Later
+            </button>
+            <button className="primary-button" type="button" onClick={applyUpdate} disabled={isApplyingUpdate}>
+              {isApplyingUpdate ? 'Updating...' : 'Update now'}
+            </button>
+          </div>
+        </section>
+      ) : null}
+
       <main className="app-shell__main">
         {activeTab === 'camera' ? (
           <CameraScreen

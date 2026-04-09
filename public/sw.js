@@ -1,4 +1,4 @@
-const CACHE_NAME = 'pushup-counter-v4';
+const CACHE_NAME = 'pushup-counter-v5';
 const APP_SHELL = [
   './',
   './index.html',
@@ -20,10 +20,15 @@ const INDEX_URL = new URL('./index.html', self.registration.scope).toString();
 const APP_SHELL_URLS = new Set(APP_SHELL.map((path) => new URL(path, self.registration.scope).toString()));
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL))
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    event.waitUntil(self.skipWaiting());
+  }
 });
 
 self.addEventListener('activate', (event) => {

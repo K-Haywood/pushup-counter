@@ -48,6 +48,33 @@ button {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.update-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-bottom: 1px solid rgba(132, 255, 173, 0.2);
+  background: rgba(8, 20, 31, 0.94);
+  backdrop-filter: blur(16px);
+}
+
+.update-banner__title {
+  display: block;
+  margin-top: 0.15rem;
+}
+
+.update-banner__actions {
+  display: flex;
+  gap: 0.65rem;
+}
+
+.update-banner__actions .secondary-button,
+.update-banner__actions .primary-button {
+  min-height: 2.9rem;
+  padding: 0.7rem 0.95rem;
+}
+
 .app-shell__main {
   flex: 1;
 }
@@ -339,7 +366,56 @@ button {
 }
 
 .camera-stage__viewport--session {
-  height: min(44vh, 21rem);
+  height: min(48vh, 24rem);
+}
+
+.camera-stage--hero .camera-stage__viewport {
+  border-radius: 1.25rem;
+}
+
+.camera-stage__hud,
+.camera-stage__footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem;
+  z-index: 2;
+}
+
+.camera-stage__hud {
+  top: 0;
+  align-items: flex-start;
+}
+
+.camera-stage__footer {
+  bottom: 0;
+  flex-wrap: wrap;
+  align-items: flex-end;
+}
+
+.camera-stage__hud-card {
+  padding: 0.7rem 0.8rem;
+  border-radius: 1rem;
+  background: rgba(4, 12, 19, 0.78);
+  backdrop-filter: blur(10px);
+}
+
+.camera-stage__hud-card span {
+  display: block;
+  color: rgba(239, 247, 255, 0.8);
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.camera-stage__hud-card strong {
+  display: block;
+  margin-top: 0.15rem;
+  font-size: 1.2rem;
+  font-weight: 800;
 }
 
 .camera-stage__video,
@@ -583,7 +659,7 @@ button {
   }
 
   .camera-stage__viewport--session {
-    height: min(34vh, 17rem);
+    height: min(38vh, 18rem);
   }
 
   .primary-button,
@@ -620,15 +696,28 @@ button {
 }
 
 @media (max-width: 480px) {
+  .update-banner,
+  .update-banner__actions,
   .session-hero,
-  .session-progress {
+  .session-progress,
+  .camera-stage__hud {
     flex-direction: column;
     align-items: stretch;
   }
 
+  .update-banner__actions .secondary-button,
+  .update-banner__actions .primary-button {
+    width: 100%;
+  }
+
   .session-hero__goal,
-  .session-progress__chip {
+  .session-progress__chip,
+  .camera-stage__hud .status-pill {
     align-self: flex-start;
+  }
+
+  .camera-stage__footer {
+    justify-content: flex-start;
   }
 
   .session-metrics,

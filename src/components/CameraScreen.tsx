@@ -48,33 +48,43 @@ export function CameraScreen({
 
   return (
     <section className="screen screen--camera">
-      <header className="session-hero panel">
-        <div>
-          <p className="eyebrow">Pushup Counter</p>
-          <h1>Ready for your next set</h1>
-          <p className="subtle-copy">
-            {setsDoneToday} sets today
-            {streak > 0 ? ` • ${streak}-day streak` : ''}
-          </p>
+      <section className="camera-stage panel panel--tight camera-stage--hero">
+        <div className="camera-stage__viewport camera-stage__viewport--session">
+          <video ref={videoRef} className="camera-stage__video" muted playsInline />
+          <canvas ref={overlayRef} className="camera-stage__overlay" />
+
+          <div className="camera-stage__hud">
+            <div className="camera-stage__hud-card">
+              <span>Today</span>
+              <strong>
+                {todayTotal}/{dailyGoal}
+              </strong>
+            </div>
+            <p className={`status-pill status-pill--${viewState.status}`}>{formatStatusLabel(viewState.status)}</p>
+          </div>
+
+          <div className="camera-stage__footer">
+            <span className="inline-badge">Sets {setsDoneToday}</span>
+            <span className="inline-badge">Left {Math.max(0, repsRemaining)}</span>
+            {streak > 0 ? <span className="inline-badge">Streak {streak}d</span> : null}
+          </div>
         </div>
-        <div className="session-hero__goal">
-          <strong>
-            {todayTotal}/{dailyGoal}
-          </strong>
-          <span>reps today</span>
+
+        <div className="camera-stage__meta">
+          <p className="camera-stage__guidance">{viewState.guidance}</p>
+          {viewState.errorMessage ? <p className="camera-stage__error">{viewState.errorMessage}</p> : null}
         </div>
-      </header>
+      </section>
 
       <section className="panel panel--tight">
-        <div className="session-progress">
+        <div className="session-toolbar">
           <div>
-            <p className="eyebrow">Today</p>
-            <strong className="session-progress__value">
-              {todayTotal} / {dailyGoal} reps
-            </strong>
+            <p className="eyebrow">Session</p>
+            <h2>Ready for your next set</h2>
           </div>
-          <span className="session-progress__chip">{Math.max(0, repsRemaining)} left</span>
+          <span className="session-progress__chip">{Math.max(0, repsRemaining)} reps left</span>
         </div>
+
         <div className="progress-track" aria-hidden="true">
           <span className="progress-track__fill" style={{ width: `${Math.round(goalProgress * 100)}%` }} />
         </div>
@@ -89,19 +99,9 @@ export function CameraScreen({
             <strong>{currentSet?.reps ?? 0}</strong>
           </div>
           <div className="session-metric">
-            <span className="session-metric__label">Status</span>
-            <strong>{viewState.isCameraRunning ? 'Live' : 'Off'}</strong>
+            <span className="session-metric__label">Camera</span>
+            <strong>{viewState.isCameraRunning ? 'On' : 'Off'}</strong>
           </div>
-        </div>
-      </section>
-
-      <section className="panel panel--tight">
-        <div className="session-toolbar">
-          <div>
-            <p className="eyebrow">Camera</p>
-            <h2>Quick controls</h2>
-          </div>
-          <p className={`status-pill status-pill--${viewState.status}`}>{formatStatusLabel(viewState.status)}</p>
         </div>
 
         <div className="button-grid button-grid--session">
@@ -151,22 +151,6 @@ export function CameraScreen({
             </button>
           </div>
         ) : null}
-      </section>
-
-      <section className="camera-stage panel panel--tight">
-        <div className="camera-stage__viewport camera-stage__viewport--session">
-          <video ref={videoRef} className="camera-stage__video" muted playsInline />
-          <canvas ref={overlayRef} className="camera-stage__overlay" />
-        </div>
-        <div className="camera-stage__meta">
-          <p className="camera-stage__guidance">{viewState.guidance}</p>
-          {viewState.errorMessage ? <p className="camera-stage__error">{viewState.errorMessage}</p> : null}
-          <div className="inline-badges">
-            <span className="inline-badge">Set {currentSet?.reps ?? 0}</span>
-            <span className="inline-badge">Phase {PHASE_LABELS[viewState.phase]}</span>
-            <span className="inline-badge">Confidence {Math.round(viewState.confidence * 100)}%</span>
-          </div>
-        </div>
       </section>
 
       {(viewState.calibrationActive || viewState.calibrationSnapshot) && viewState.isCameraRunning ? (
