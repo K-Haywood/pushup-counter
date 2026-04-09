@@ -11,6 +11,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('camera');
   const [updateRegistration, setUpdateRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
+  const [savedSetMessage, setSavedSetMessage] = useState<string | null>(null);
   const buildLabel = new Date(__APP_BUILD__).toLocaleString([], {
     year: 'numeric',
     month: 'short',
@@ -58,6 +59,18 @@ export default function App() {
       window.removeEventListener('pushup-counter:new-version-available', handleUpdateReady as EventListener);
     };
   }, []);
+
+  useEffect(() => {
+    if (!savedSetMessage) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      setSavedSetMessage(null);
+    }, 3200);
+
+    return () => window.clearTimeout(timeout);
+  }, [savedSetMessage]);
 
   function applyUpdate() {
     if (updateRegistration?.waiting) {
@@ -121,8 +134,11 @@ export default function App() {
 
               startSet();
             }}
-            onEndSet={endSet}
-            onCalibrate={poseSession.startCalibration}
+            onEndSet={() => {
+              const reps = currentSet?.reps ?? 0;
+              endSet();
+              setSavedSetMessage(reps > 0 ? `Set saved: ${reps} reps` : 'Set saved');
+            }}
             onFlipCamera={() =>
               updateSettings({
                 preferredCameraId: null,
@@ -131,6 +147,7 @@ export default function App() {
               })
             }
             onAdjustSet={adjustCurrentSet}
+            savedSetMessage={savedSetMessage}
           />
         ) : null}
 

@@ -15,9 +15,9 @@ interface CameraScreenProps {
   onToggleCamera: () => void;
   onStartWorkout: () => void | Promise<void>;
   onEndSet: () => void;
-  onCalibrate: () => void;
   onFlipCamera: () => void;
   onAdjustSet: (delta: number) => void;
+  savedSetMessage: string | null;
   currentFacingMode: CameraFacingMode;
 }
 
@@ -39,13 +39,11 @@ export function CameraScreen({
   onToggleCamera,
   onStartWorkout,
   onEndSet,
-  onCalibrate,
   onFlipCamera,
   onAdjustSet,
+  savedSetMessage,
   currentFacingMode
 }: CameraScreenProps) {
-  const goalProgress = dailyGoal > 0 ? Math.min(1, todayTotal / dailyGoal) : 0;
-
   return (
     <section className="screen screen--camera">
       <section className="camera-stage panel panel--tight camera-stage--hero">
@@ -77,6 +75,7 @@ export function CameraScreen({
         </div>
 
         <div className="camera-stage__meta camera-stage__meta--compact">
+          {savedSetMessage ? <p className="camera-stage__saved">{savedSetMessage}</p> : null}
           <p className="camera-stage__guidance">{viewState.guidance}</p>
           {viewState.errorMessage ? <p className="camera-stage__error">{viewState.errorMessage}</p> : null}
           {viewState.calibrationActive ? (
@@ -91,21 +90,6 @@ export function CameraScreen({
       </section>
 
       <section className="panel panel--tight session-dock">
-        <div className="session-dock__summary">
-          <div className="session-metric">
-            <span className="session-metric__label">Goal</span>
-            <strong>{Math.round(goalProgress * 100)}%</strong>
-          </div>
-          <div className="session-metric">
-            <span className="session-metric__label">Camera</span>
-            <strong>{viewState.isCameraRunning ? 'On' : 'Off'}</strong>
-          </div>
-          <div className="session-metric">
-            <span className="session-metric__label">Confidence</span>
-            <strong>{Math.round(viewState.confidence * 100)}%</strong>
-          </div>
-        </div>
-
         <div className="session-dock__controls session-dock__controls--top">
           <button className="primary-button" type="button" onClick={onToggleCamera}>
             {viewState.isCameraRunning ? 'Stop camera' : 'Start camera'}
@@ -141,15 +125,6 @@ export function CameraScreen({
           >
             -1
           </button>
-        </div>
-
-        <div className="session-dock__footer">
-          <button className="text-button" type="button" onClick={onCalibrate}>
-            {viewState.calibrationSnapshot ? 'Recalibrate' : 'Calibrate top position'}
-          </button>
-          <span className="session-dock__footer-copy">
-            Place the phone low, front-on, and keep shoulders, elbows, wrists, and hips visible.
-          </span>
         </div>
       </section>
     </section>

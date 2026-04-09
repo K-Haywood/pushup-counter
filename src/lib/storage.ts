@@ -60,6 +60,22 @@ function migrateLegacyNumberSetting(
   return resolved;
 }
 
+function migrateRecentNumberSetting(
+  rawValue: unknown,
+  nextDefault: number,
+  recentDefault: number,
+  parsedVersion: number,
+  targetVersion: number
+): number {
+  const resolved = ensureNumber(rawValue, nextDefault);
+
+  if (parsedVersion < targetVersion && (rawValue == null || resolved === recentDefault)) {
+    return nextDefault;
+  }
+
+  return resolved;
+}
+
 export function loadStoredState(storageKey: string): StoredAppState {
   if (typeof window === 'undefined') {
     return createEmptyStoredState();
@@ -82,60 +98,114 @@ export function loadStoredState(storageKey: string): StoredAppState {
       cameraFacingMode: parsed.settings?.cameraFacingMode === 'user' ? 'user' : 'environment',
       preferredCameraId:
         typeof parsed.settings?.preferredCameraId === 'string' ? parsed.settings.preferredCameraId : null,
-      smoothingFrames: migrateLegacyNumberSetting(
-        parsed.settings?.smoothingFrames,
+      smoothingFrames: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.smoothingFrames,
+          DEFAULT_SETTINGS.smoothingFrames,
+          5,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.smoothingFrames,
-        5,
-        parsedVersion
+        4,
+        parsedVersion,
+        3
       ),
-      topThreshold: migrateLegacyNumberSetting(
-        parsed.settings?.topThreshold,
+      topThreshold: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.topThreshold,
+          DEFAULT_SETTINGS.topThreshold,
+          155,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.topThreshold,
-        155,
-        parsedVersion
+        148,
+        parsedVersion,
+        3
       ),
-      bottomThreshold: migrateLegacyNumberSetting(
-        parsed.settings?.bottomThreshold,
+      bottomThreshold: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.bottomThreshold,
+          DEFAULT_SETTINGS.bottomThreshold,
+          95,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.bottomThreshold,
-        95,
-        parsedVersion
+        110,
+        parsedVersion,
+        3
       ),
-      minLandmarkVisibility: migrateLegacyNumberSetting(
-        parsed.settings?.minLandmarkVisibility,
+      minLandmarkVisibility: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.minLandmarkVisibility,
+          DEFAULT_SETTINGS.minLandmarkVisibility,
+          0.65,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.minLandmarkVisibility,
-        0.65,
-        parsedVersion
+        0.5,
+        parsedVersion,
+        3
       ),
-      bodyAlignmentTolerance: migrateLegacyNumberSetting(
-        parsed.settings?.bodyAlignmentTolerance,
+      bodyAlignmentTolerance: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.bodyAlignmentTolerance,
+          DEFAULT_SETTINGS.bodyAlignmentTolerance,
+          0.12,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.bodyAlignmentTolerance,
-        0.12,
-        parsedVersion
+        0.18,
+        parsedVersion,
+        3
       ),
       sideViewMaxRatio: ensureNumber(parsed.settings?.sideViewMaxRatio, DEFAULT_SETTINGS.sideViewMaxRatio),
-      frontViewMinRatio: migrateLegacyNumberSetting(
-        parsed.settings?.frontViewMinRatio,
+      frontViewMinRatio: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.frontViewMinRatio,
+          DEFAULT_SETTINGS.frontViewMinRatio,
+          0.55,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.frontViewMinRatio,
-        0.55,
-        parsedVersion
+        0.42,
+        parsedVersion,
+        3
       ),
-      armSymmetryTolerance: migrateLegacyNumberSetting(
-        parsed.settings?.armSymmetryTolerance,
+      armSymmetryTolerance: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.armSymmetryTolerance,
+          DEFAULT_SETTINGS.armSymmetryTolerance,
+          0.14,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.armSymmetryTolerance,
-        0.14,
-        parsedVersion
+        0.28,
+        parsedVersion,
+        3
       ),
-      cooldownMs: migrateLegacyNumberSetting(
-        parsed.settings?.cooldownMs,
+      cooldownMs: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.cooldownMs,
+          DEFAULT_SETTINGS.cooldownMs,
+          650,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.cooldownMs,
-        650,
-        parsedVersion
+        700,
+        parsedVersion,
+        3
       ),
-      calibrationHoldMs: migrateLegacyNumberSetting(
-        parsed.settings?.calibrationHoldMs,
+      calibrationHoldMs: migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(
+          parsed.settings?.calibrationHoldMs,
+          DEFAULT_SETTINGS.calibrationHoldMs,
+          1200,
+          parsedVersion
+        ),
         DEFAULT_SETTINGS.calibrationHoldMs,
-        1200,
-        parsedVersion
+        900,
+        parsedVersion,
+        3
       )
     };
 

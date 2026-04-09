@@ -211,11 +211,22 @@ export function analyzePoseFrame(
   const shoulderWidth = distance(leftShoulder, rightShoulder);
   const hipWidth = distance(leftHip, rightHip);
   const bodyScale = torsoHeight > 0.001 ? torsoHeight : shoulderWidth * 1.4;
+  const upperBodyScale = Math.max(shoulderWidth, bodyScale * 0.72, 0.001);
   const shoulderWidthRatio = bodyScale === 0 ? 0 : shoulderWidth / bodyScale;
   const hipWidthRatio = bodyScale === 0 ? 0 : hipWidth / bodyScale;
+  const primaryVerticalSpan = (primaryArm.wrist.y - primaryArm.shoulder.y) / upperBodyScale;
+  const secondaryVerticalSpan = (secondaryArm.wrist.y - secondaryArm.shoulder.y) / upperBodyScale;
+  const armVerticalSpanRatio = weightedAverage([
+    { value: primaryVerticalSpan, weight: Math.max(primaryArm.visibilityScore, 0.01) },
+    ...(secondaryArmUsable
+      ? [{ value: secondaryVerticalSpan, weight: Math.max(secondaryArm.visibilityScore * 0.65, 0.01) }]
+      : [])
+  ]);
+  const reachDerivedAngle = clamp(42 + armVerticalSpanRatio * 76, 72, 170);
 
   const weightedElbowAngle = weightedAverage([
     { value: primaryArm.elbowAngle, weight: Math.max(primaryArm.visibilityScore, 0.01) },
+    { value: reachDerivedAngle, weight: 0.36 },
     ...(secondaryArmUsable
       ? [{ value: secondaryArm.elbowAngle, weight: Math.max(secondaryArm.visibilityScore * 0.65, 0.01) }]
       : [])
