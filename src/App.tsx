@@ -2,14 +2,13 @@ import { useState } from 'react';
 import { BottomNav } from './components/BottomNav';
 import { CameraScreen } from './components/CameraScreen';
 import { HistoryScreen } from './components/HistoryScreen';
-import { HomeScreen } from './components/HomeScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { usePersistentAppState } from './hooks/usePersistentAppState';
 import { usePushupPoseSession } from './hooks/usePushupPoseSession';
 import type { AppTab } from './types/app';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [activeTab, setActiveTab] = useState<AppTab>('camera');
   const {
     state,
     today,
@@ -17,12 +16,10 @@ export default function App() {
     summary,
     last7Days,
     last30Days,
-    setTodayGoal,
     startSet,
     endSet,
     addAutoRep,
     adjustCurrentSet,
-    resetCurrentSet,
     updateSettings
   } = usePersistentAppState();
 
@@ -32,28 +29,31 @@ export default function App() {
     onRepCounted: addAutoRep
   });
 
+  const setsDoneToday = today.sets.filter((set) => set.reps > 0 || Boolean(set.endedAt)).length;
+
   return (
     <div className="app-shell">
       <main className="app-shell__main">
-        {activeTab === 'home' ? (
-          <HomeScreen
-            summary={summary}
-            today={today}
-            currentSet={currentSet}
-            onSaveGoal={setTodayGoal}
-          />
-        ) : null}
-
         {activeTab === 'camera' ? (
           <CameraScreen
             currentSet={currentSet}
             setActive={Boolean(currentSet)}
             currentFacingMode={state.settings.cameraFacingMode}
+            todayTotal={today.totalReps}
+            dailyGoal={today.dailyGoal}
+            setsDoneToday={setsDoneToday}
+            repsRemaining={summary.remaining}
+            streak={summary.streak}
             viewState={poseSession.viewState}
             videoRef={poseSession.videoRef}
             overlayRef={poseSession.overlayRef}
-            onStartCamera={() => void poseSession.startCamera()}
-            onStopCamera={() => void poseSession.stopCamera()}
+            onToggleCamera={() => {
+              if (poseSession.viewState.isCameraRunning) {
+                void poseSession.stopCamera();
+              } else {
+                void poseSession.startCamera();
+              }
+            }}
             onStartSet={startSet}
             onEndSet={endSet}
             onCalibrate={poseSession.startCalibration}
@@ -65,7 +65,6 @@ export default function App() {
               })
             }
             onAdjustSet={adjustCurrentSet}
-            onResetSet={resetCurrentSet}
           />
         ) : null}
 

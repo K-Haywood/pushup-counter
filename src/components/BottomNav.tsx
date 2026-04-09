@@ -6,8 +6,7 @@ interface BottomNavProps {
 }
 
 const ITEMS: Array<{ key: AppTab; label: string }> = [
-  { key: 'home', label: 'Home' },
-  { key: 'camera', label: 'Camera' },
+  { key: 'camera', label: 'Session' },
   { key: 'history', label: 'History' },
   { key: 'settings', label: 'Settings' }
 ];

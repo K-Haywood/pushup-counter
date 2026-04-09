@@ -1,4 +1,4 @@
-export type AppTab = 'home' | 'camera' | 'history' | 'settings';
+export type AppTab = 'camera' | 'history' | 'settings';
 
 export type CounterPhase = 'top' | 'descending' | 'bottom' | 'ascending';
 

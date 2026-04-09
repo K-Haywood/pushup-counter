@@ -54,13 +54,15 @@ export function SettingsScreen({
       <header className="screen-header">
         <div>
           <p className="eyebrow">Settings</p>
-          <h1>Tuning and preferences</h1>
+          <h1>Quick preferences</h1>
         </div>
       </header>
 
       <section className="panel form-panel">
+        <p className="eyebrow">Essentials</p>
+
         <label className="field">
-          <span>Default daily goal</span>
+          <span>Daily goal</span>
           <input
             type="number"
             min={1}
@@ -103,7 +105,7 @@ export function SettingsScreen({
             <option value="environment">Rear camera</option>
             <option value="user">Front camera</option>
           </select>
-          <small>The flip button on the camera screen uses this front or rear preference.</small>
+          <small>Used when you tap flip camera on the workout screen.</small>
         </label>
 
         <label className="field">
@@ -121,88 +123,96 @@ export function SettingsScreen({
               </option>
             ))}
           </select>
-          <small>Camera labels appear after permission. A specific camera overrides front or rear preference.</small>
+          <small>Only needed if your phone exposes multiple cameras after permission is granted.</small>
         </label>
       </section>
 
-      <section className="panel form-panel">
-        <p className="eyebrow">Rep sensitivity</p>
-        <h2>Push-up thresholds</h2>
+      <section className="panel form-panel details-panel">
+        <details>
+          <summary className="eyebrow">
+            Advanced tuning
+          </summary>
+          <p className="details-panel__copy">
+            Leave these alone unless rep counting feels too strict or too loose.
+          </p>
 
-        <SliderField
-          label="Smoothing frames"
-          min={2}
-          max={10}
-          step={1}
-          value={settings.smoothingFrames}
-          onChange={(nextValue) => onUpdateSettings({ smoothingFrames: nextValue })}
-        />
+          <div className="details-panel__body">
+            <SliderField
+              label="Smoothing frames"
+              min={2}
+              max={10}
+              step={1}
+              value={settings.smoothingFrames}
+              onChange={(nextValue) => onUpdateSettings({ smoothingFrames: nextValue })}
+            />
 
-        <SliderField
-          label="Top threshold"
-          min={145}
-          max={175}
-          step={1}
-          value={settings.topThreshold}
-          suffix=" deg"
-          onChange={(nextValue) => onUpdateSettings({ topThreshold: nextValue })}
-        />
+            <SliderField
+              label="Top threshold"
+              min={145}
+              max={175}
+              step={1}
+              value={settings.topThreshold}
+              suffix=" deg"
+              onChange={(nextValue) => onUpdateSettings({ topThreshold: nextValue })}
+            />
 
-        <SliderField
-          label="Bottom threshold"
-          min={75}
-          max={115}
-          step={1}
-          value={settings.bottomThreshold}
-          suffix=" deg"
-          onChange={(nextValue) => onUpdateSettings({ bottomThreshold: nextValue })}
-        />
+            <SliderField
+              label="Bottom threshold"
+              min={75}
+              max={115}
+              step={1}
+              value={settings.bottomThreshold}
+              suffix=" deg"
+              onChange={(nextValue) => onUpdateSettings({ bottomThreshold: nextValue })}
+            />
 
-        <SliderField
-          label="Minimum landmark visibility"
-          min={0.4}
-          max={0.9}
-          step={0.01}
-          value={Number(settings.minLandmarkVisibility.toFixed(2))}
-          onChange={(nextValue) => onUpdateSettings({ minLandmarkVisibility: nextValue })}
-        />
+            <SliderField
+              label="Minimum landmark visibility"
+              min={0.4}
+              max={0.9}
+              step={0.01}
+              value={Number(settings.minLandmarkVisibility.toFixed(2))}
+              onChange={(nextValue) => onUpdateSettings({ minLandmarkVisibility: nextValue })}
+            />
 
-        <SliderField
-          label="Front-view alignment tolerance"
-          min={0.05}
-          max={0.2}
-          step={0.01}
-          value={Number(settings.bodyAlignmentTolerance.toFixed(2))}
-          onChange={(nextValue) => onUpdateSettings({ bodyAlignmentTolerance: nextValue })}
-        />
+            <SliderField
+              label="Front-view alignment tolerance"
+              min={0.05}
+              max={0.2}
+              step={0.01}
+              value={Number(settings.bodyAlignmentTolerance.toFixed(2))}
+              onChange={(nextValue) => onUpdateSettings({ bodyAlignmentTolerance: nextValue })}
+            />
 
-        <SliderField
-          label="Front-view shoulder width"
-          min={0.35}
-          max={0.85}
-          step={0.01}
-          value={Number(settings.frontViewMinRatio.toFixed(2))}
-          onChange={(nextValue) => onUpdateSettings({ frontViewMinRatio: nextValue })}
-        />
+            <SliderField
+              label="Front-view shoulder width"
+              min={0.35}
+              max={0.85}
+              step={0.01}
+              value={Number(settings.frontViewMinRatio.toFixed(2))}
+              onChange={(nextValue) => onUpdateSettings({ frontViewMinRatio: nextValue })}
+            />
 
-        <SliderField
-          label="Arm symmetry tolerance"
-          min={0.05}
-          max={0.3}
-          step={0.01}
-          value={Number(settings.armSymmetryTolerance.toFixed(2))}
-          onChange={(nextValue) => onUpdateSettings({ armSymmetryTolerance: nextValue })}
-        />
+            <SliderField
+              label="Arm symmetry tolerance"
+              min={0.05}
+              max={0.3}
+              step={0.01}
+              value={Number(settings.armSymmetryTolerance.toFixed(2))}
+              onChange={(nextValue) => onUpdateSettings({ armSymmetryTolerance: nextValue })}
+            />
 
-        <SliderField
-          label="Cooldown"
-          min={350}
-          max={1200}
-          step={25}
-          value={settings.cooldownMs}
-          suffix=" ms"
-          onChange={(nextValue) => onUpdateSettings({ cooldownMs: nextValue })}
-        />
+            <SliderField
+              label="Cooldown"
+              min={350}
+              max={1200}
+              step={25}
+              value={settings.cooldownMs}
+              suffix=" ms"
+              onChange={(nextValue) => onUpdateSettings({ cooldownMs: nextValue })}
+            />
+          </div>
+        </details>
       </section>
     </section>
   );
