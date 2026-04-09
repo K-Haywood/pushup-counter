@@ -87,7 +87,7 @@ export function usePushupPoseSession({
     if (streamRef.current) {
       void startCameraRef.current();
     }
-  }, [settings.preferredCameraId]);
+  }, [settings.preferredCameraId, settings.cameraFacingMode]);
 
   async function ensurePoseLandmarker(): Promise<PoseLandmarker> {
     if (poseLandmarkerRef.current) {
@@ -98,7 +98,7 @@ export function usePushupPoseSession({
       ...current,
       isLoadingModel: true,
       status: 'loading',
-      guidance: 'Loading on-device pose model…',
+      guidance: 'Loading on-device pose model...',
       errorMessage: null
     }));
 
@@ -144,7 +144,7 @@ export function usePushupPoseSession({
               height: { ideal: 720 }
             }
           : {
-              facingMode: { ideal: 'environment' },
+              facingMode: { ideal: settings.cameraFacingMode },
               width: { ideal: 1280 },
               height: { ideal: 720 }
             }
@@ -157,14 +157,17 @@ export function usePushupPoseSession({
         stream = await navigator.mediaDevices.getUserMedia({
           audio: false,
           video: {
-            facingMode: { ideal: 'environment' }
+            facingMode: { ideal: settings.cameraFacingMode }
           }
         });
       }
 
       streamRef.current = stream;
       video.srcObject = stream;
+      video.autoplay = true;
       video.playsInline = true;
+      video.setAttribute('playsinline', 'true');
+      video.setAttribute('webkit-playsinline', 'true');
       video.muted = true;
       await video.play();
 
@@ -307,7 +310,8 @@ export function usePushupPoseSession({
           draft.samples.reduce((sum, sample) => sum + (sample.shoulderWidthRatio ?? 0), 0) /
           draft.samples.length;
         const hipWidthRatio =
-          draft.samples.reduce((sum, sample) => sum + (sample.hipWidthRatio ?? 0), 0) / draft.samples.length;
+          draft.samples.reduce((sum, sample) => sum + (sample.hipWidthRatio ?? 0), 0) /
+          draft.samples.length;
         const latest = draft.samples[draft.samples.length - 1];
 
         calibrationSnapshotRef.current = {

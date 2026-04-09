@@ -91,6 +91,22 @@ export function SettingsScreen({
         </label>
 
         <label className="field">
+          <span>Default camera side</span>
+          <select
+            value={settings.cameraFacingMode}
+            onChange={(event) =>
+              onUpdateSettings({
+                cameraFacingMode: event.target.value === 'user' ? 'user' : 'environment'
+              })
+            }
+          >
+            <option value="environment">Rear camera</option>
+            <option value="user">Front camera</option>
+          </select>
+          <small>The flip button on the camera screen uses this front or rear preference.</small>
+        </label>
+
+        <label className="field">
           <span>Preferred camera</span>
           <select
             value={settings.preferredCameraId ?? ''}
@@ -98,14 +114,14 @@ export function SettingsScreen({
               onUpdateSettings({ preferredCameraId: event.target.value || null })
             }
           >
-            <option value="">Auto (prefer back camera)</option>
+            <option value="">Auto (use front or rear preference)</option>
             {cameras.map((camera) => (
               <option key={camera.deviceId} value={camera.deviceId}>
                 {camera.label}
               </option>
             ))}
           </select>
-          <small>Camera labels appear after you grant camera permission.</small>
+          <small>Camera labels appear after permission. A specific camera overrides front or rear preference.</small>
         </label>
       </section>
 
@@ -128,7 +144,7 @@ export function SettingsScreen({
           max={175}
           step={1}
           value={settings.topThreshold}
-          suffix="°"
+          suffix=" deg"
           onChange={(nextValue) => onUpdateSettings({ topThreshold: nextValue })}
         />
 
@@ -138,7 +154,7 @@ export function SettingsScreen({
           max={115}
           step={1}
           value={settings.bottomThreshold}
-          suffix="°"
+          suffix=" deg"
           onChange={(nextValue) => onUpdateSettings({ bottomThreshold: nextValue })}
         />
 

@@ -4,6 +4,8 @@ export type CounterPhase = 'top' | 'descending' | 'bottom' | 'ascending';
 
 export type BodySide = 'left' | 'right';
 
+export type CameraFacingMode = 'environment' | 'user';
+
 export type PoseStatus =
   | 'idle'
   | 'loading'
@@ -19,6 +21,7 @@ export interface AppSettings {
   defaultDailyGoal: number;
   soundEnabled: boolean;
   vibrationEnabled: boolean;
+  cameraFacingMode: CameraFacingMode;
   preferredCameraId: string | null;
   smoothingFrames: number;
   topThreshold: number;

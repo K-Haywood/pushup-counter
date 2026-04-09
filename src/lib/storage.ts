@@ -40,6 +40,7 @@ export function loadStoredState(storageKey: string): StoredAppState {
       defaultDailyGoal: ensureNumber(parsed.settings?.defaultDailyGoal, DEFAULT_SETTINGS.defaultDailyGoal),
       soundEnabled: ensureBoolean(parsed.settings?.soundEnabled, DEFAULT_SETTINGS.soundEnabled),
       vibrationEnabled: ensureBoolean(parsed.settings?.vibrationEnabled, DEFAULT_SETTINGS.vibrationEnabled),
+      cameraFacingMode: parsed.settings?.cameraFacingMode === 'user' ? 'user' : 'environment',
       preferredCameraId:
         typeof parsed.settings?.preferredCameraId === 'string' ? parsed.settings.preferredCameraId : null,
       smoothingFrames: ensureNumber(parsed.settings?.smoothingFrames, DEFAULT_SETTINGS.smoothingFrames),

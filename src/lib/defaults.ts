@@ -13,6 +13,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultDailyGoal: 100,
   soundEnabled: true,
   vibrationEnabled: true,
+  cameraFacingMode: 'environment',
   preferredCameraId: null,
   smoothingFrames: 5,
   topThreshold: 155,

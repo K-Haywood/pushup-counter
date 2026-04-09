@@ -1,5 +1,5 @@
 import { PHASE_LABELS } from '../lib/defaults';
-import type { PoseSessionViewState, SetRecord } from '../types/app';
+import type { CameraFacingMode, PoseSessionViewState, SetRecord } from '../types/app';
 import { StatCard } from './StatCard';
 
 interface CameraScreenProps {
@@ -13,8 +13,10 @@ interface CameraScreenProps {
   onStartSet: () => void;
   onEndSet: () => void;
   onCalibrate: () => void;
+  onFlipCamera: () => void;
   onAdjustSet: (delta: number) => void;
   onResetSet: () => void;
+  currentFacingMode: CameraFacingMode;
 }
 
 export function CameraScreen({
@@ -28,8 +30,10 @@ export function CameraScreen({
   onStartSet,
   onEndSet,
   onCalibrate,
+  onFlipCamera,
   onAdjustSet,
-  onResetSet
+  onResetSet,
+  currentFacingMode
 }: CameraScreenProps) {
   return (
     <section className="screen">
@@ -54,7 +58,11 @@ export function CameraScreen({
 
       <div className="stats-grid">
         <StatCard label="Current set" value={currentSet?.reps ?? 0} accent="lime" />
-        <StatCard label="Phase" value={PHASE_LABELS[viewState.phase]} helper={setActive ? 'Counting live' : 'Preview only'} />
+        <StatCard
+          label="Phase"
+          value={PHASE_LABELS[viewState.phase]}
+          helper={setActive ? 'Counting live' : 'Preview only'}
+        />
         <StatCard
           label="Confidence"
           value={`${Math.round(viewState.confidence * 100)}%`}
@@ -62,7 +70,7 @@ export function CameraScreen({
         />
         <StatCard
           label="Elbow angle"
-          value={viewState.smoothedAngle ? `${Math.round(viewState.smoothedAngle)}°` : '—'}
+          value={viewState.smoothedAngle ? `${Math.round(viewState.smoothedAngle)} deg` : '--'}
           helper={viewState.selectedSide ? `${viewState.selectedSide} side` : 'No side locked'}
         />
       </div>
@@ -101,6 +109,12 @@ export function CameraScreen({
           <button className="secondary-button" type="button" onClick={onCalibrate}>
             Calibrate
           </button>
+          <button className="secondary-button" type="button" onClick={onFlipCamera}>
+            {currentFacingMode === 'environment' ? 'Use front camera' : 'Use rear camera'}
+          </button>
+        </div>
+
+        <div className="button-grid">
           {setActive ? (
             <button className="accent-button" type="button" onClick={onEndSet}>
               End set
@@ -133,6 +147,7 @@ export function CameraScreen({
           <li>Use side-on framing with shoulders, hips, knees, and ankles visible.</li>
           <li>Keep strong lighting on your body so elbows and wrists are clear.</li>
           <li>Only one person should be in frame while counting is active.</li>
+          <li>Tap the flip button to swap between the front and rear cameras.</li>
         </ul>
       </section>
     </section>

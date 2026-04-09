@@ -48,6 +48,7 @@ export default function App() {
           <CameraScreen
             currentSet={currentSet}
             setActive={Boolean(currentSet)}
+            currentFacingMode={state.settings.cameraFacingMode}
             viewState={poseSession.viewState}
             videoRef={poseSession.videoRef}
             overlayRef={poseSession.overlayRef}
@@ -56,6 +57,13 @@ export default function App() {
             onStartSet={startSet}
             onEndSet={endSet}
             onCalibrate={poseSession.startCalibration}
+            onFlipCamera={() =>
+              updateSettings({
+                preferredCameraId: null,
+                cameraFacingMode:
+                  state.settings.cameraFacingMode === 'environment' ? 'user' : 'environment'
+              })
+            }
             onAdjustSet={adjustCurrentSet}
             onResetSet={resetCurrentSet}
           />
