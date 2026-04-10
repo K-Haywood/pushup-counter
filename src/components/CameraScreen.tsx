@@ -1,10 +1,5 @@
 import { PHASE_LABELS } from '../lib/defaults';
-import {
-  formatAnalysisDurationMs,
-  formatAnalysisPercent,
-  formatAnalysisScore,
-  getFormTakeaway
-} from '../lib/formInsights';
+import { formatAnalysisScore, getFormTakeaway } from '../lib/formInsights';
 import type { CameraFacingMode, PoseSessionViewState, RecentSetInsight, SetRecord } from '../types/app';
 
 interface CameraScreenProps {
@@ -14,6 +9,7 @@ interface CameraScreenProps {
   dailyGoal: number;
   setsDoneToday: number;
   repsRemaining: number;
+  streak: number;
   viewState: PoseSessionViewState;
   videoRef: React.RefObject<HTMLVideoElement | null>;
   overlayRef: React.RefObject<HTMLCanvasElement | null>;
@@ -35,9 +31,8 @@ function formatStatusLabel(status: string) {
     'no-person': 'Finding you',
     'multiple-people': 'One person only',
     'low-confidence': 'Hold steady',
-    'bad-angle': 'Adjust view'
+    'bad-angle': 'Adjust angle'
   };
-
   return labels[status] ?? status.replace('-', ' ');
 }
 
@@ -48,6 +43,7 @@ export function CameraScreen({
   dailyGoal,
   setsDoneToday,
   repsRemaining,
+  streak,
   viewState,
   videoRef,
   overlayRef,
@@ -59,124 +55,159 @@ export function CameraScreen({
   savedSessionInsight,
   currentFacingMode
 }: CameraScreenProps) {
-  const helperMessage =
-    viewState.errorMessage ?? (viewState.status !== 'ready' || viewState.calibrationActive ? viewState.guidance : null);
-  const helperClassName = viewState.errorMessage ? 'camera-stage__error' : 'camera-stage__guidance';
+  const goalProgress = dailyGoal > 0 ? Math.min(1, todayTotal / dailyGoal) : 0;
 
   return (
     <section className="screen screen--camera">
-      <section className="panel panel--tight session-card">
-        <div className="session-card__split">
-          <div className="camera-stage__viewport camera-stage__viewport--session">
-            <video ref={videoRef} className="camera-stage__video" muted playsInline />
-            <canvas ref={overlayRef} className="camera-stage__overlay" />
+
+      {/* ── LEFT: full-height camera feed ── */}
+      <div className="cam-feed">
+        <video ref={videoRef} className="cam-feed__video" muted playsInline />
+        <canvas ref={overlayRef} className="cam-feed__canvas" />
+
+        {/* Goal ring shown when camera is off */}
+        {!viewState.isCameraRunning && (
+          <div className="cam-feed__idle">
+            <div
+              className="cam-ring"
+              style={{
+                background: `conic-gradient(#ff8c1a ${goalProgress * 360}deg, rgba(255,255,255,0.06) 0deg)`
+              }}
+              aria-label={`Goal progress ${Math.round(goalProgress * 100)} percent`}
+            >
+              <div className="cam-ring__inner">
+                <span className="cam-ring__value">{todayTotal}</span>
+                <span className="cam-ring__label">/{dailyGoal}</span>
+              </div>
+            </div>
+            {streak > 0 && (
+              <p className="cam-feed__idle-streak">{streak}d streak 🔥</p>
+            )}
+            <p className="cam-feed__idle-hint">Start camera to begin</p>
           </div>
+        )}
 
-          <aside className="session-rail" aria-label="Session overview">
-            <div className="session-rail__goal">
-              <span className="session-rail__label">Today</span>
-              <strong className="session-rail__value">
-                {todayTotal}
-                <span>/{dailyGoal}</span>
-              </strong>
-              <small className="session-rail__hint">{Math.max(0, repsRemaining)} left today</small>
-            </div>
+        {/* Rep badge overlaid on feed during a set */}
+        {setActive && viewState.isCameraRunning && (
+          <div className="cam-feed__rep-badge" aria-live="polite">
+            <strong>{currentSet?.reps ?? 0}</strong>
+          </div>
+        )}
 
-            <div className="session-rail__set">
-              <span className="session-rail__label">Current set</span>
-              <strong className="session-rail__value">{currentSet?.reps ?? 0}</strong>
-              <small className="session-rail__hint">
-                {setActive ? PHASE_LABELS[viewState.phase] : 'Ready to start'}
-              </small>
-              <div className="session-rail__progress" aria-label="Rep progress">
-                <span className="session-rail__progress-label">Rep progress</span>
-                <div className="progress-track session-rail__progress-track" aria-hidden="true">
-                  <span
-                    className="progress-track__fill session-rail__progress-fill"
-                    style={{ width: `${Math.round(viewState.repProgress * 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
+        {/* Bottom bar: status + camera mode */}
+        <div className="cam-feed__foot">
+          <span className={`cam-chip cam-chip--${viewState.status}`}>
+            {formatStatusLabel(viewState.status)}
+          </span>
+          <span className="cam-feed__mode">
+            {currentFacingMode === 'environment' ? 'Rear' : 'Front'}
+          </span>
+        </div>
+      </div>
 
-            <div className="session-rail__chips">
-              <span className="inline-badge">Sets {setsDoneToday}</span>
-              <span className="inline-badge">Left {Math.max(0, repsRemaining)}</span>
-            </div>
+      {/* ── RIGHT: session controls ── */}
+      <aside className="session-panel" aria-label="Session controls">
 
-            <div className="session-rail__status">
-              <p className={`status-pill status-pill--${viewState.status}`}>{formatStatusLabel(viewState.status)}</p>
-              <p className="session-rail__camera-mode">
-                {currentFacingMode === 'environment' ? 'Rear camera' : 'Front camera'}
-              </p>
-            </div>
-          </aside>
+        {/* Hero count */}
+        <div className="session-panel__hero">
+          <p className="eyebrow">{setActive ? 'This set' : 'Today'}</p>
+          <strong className="session-panel__count">
+            {setActive ? (currentSet?.reps ?? 0) : todayTotal}
+            {!setActive && (
+              <span className="session-panel__count-goal">/{dailyGoal}</span>
+            )}
+          </strong>
+          <div className="session-panel__chips">
+            <span className="session-chip">{setsDoneToday} sets</span>
+            <span className="session-chip">{Math.max(0, repsRemaining)} left</span>
+          </div>
         </div>
 
-        {!setActive && savedSessionInsight ? (
-          <article className="session-summary-card" aria-live="polite">
-            <div className="session-summary-card__header">
-              <div>
-                <span className="session-summary-card__eyebrow">Set saved</span>
-                <strong className="session-summary-card__title">{savedSessionInsight.reps} reps</strong>
-              </div>
-              <span className="session-summary-card__score">
-                {formatAnalysisScore(savedSessionInsight.avgQualityScore)}
-              </span>
-            </div>
-            <p className="session-summary-card__copy">{getFormTakeaway(savedSessionInsight)}</p>
-            <div className="session-summary-card__chips">
-              <span className="inline-badge">Depth {formatAnalysisPercent(savedSessionInsight.avgDepth)}</span>
-              <span className="inline-badge">Tempo {formatAnalysisDurationMs(savedSessionInsight.avgCycleMs)}</span>
-              <span className="inline-badge">
-                Consistency {formatAnalysisScore(savedSessionInsight.consistencyScore)}
-              </span>
-            </div>
-          </article>
-        ) : null}
-
-        <div className="session-feedback">
-          {helperMessage ? <p className={helperClassName}>{helperMessage}</p> : null}
-        </div>
-
-        {viewState.calibrationActive ? (
-          <div className="progress-track" aria-hidden="true">
+        {/* Rep progress */}
+        <div className="session-panel__progress">
+          <span className="session-panel__phase">
+            {setActive ? PHASE_LABELS[viewState.phase] : 'Ready'}
+          </span>
+          <div className="rep-track">
             <span
-              className="progress-track__fill"
-              style={{ width: `${Math.round(viewState.calibrationProgress * 100)}%` }}
+              className="rep-track__fill"
+              style={{ width: `${Math.round(viewState.repProgress * 100)}%` }}
             />
           </div>
-        ) : null}
-      </section>
-
-      <section className="panel panel--tight session-dock">
-        <div className="session-dock__controls session-dock__controls--top">
-          <button className="primary-button" type="button" onClick={onToggleCamera}>
-            {viewState.isCameraRunning ? 'Stop camera' : 'Start camera'}
-          </button>
-          <button className="secondary-button" type="button" onClick={onFlipCamera}>
-            Flip camera
-          </button>
+          {viewState.calibrationActive && (
+            <div className="rep-track rep-track--calibrate" style={{ marginTop: '5px' }}>
+              <span
+                className="rep-track__fill"
+                style={{ width: `${Math.round(viewState.calibrationProgress * 100)}%` }}
+              />
+            </div>
+          )}
         </div>
 
-        <div className="session-dock__controls session-dock__controls--main">
+        {/* Feedback / recap */}
+        <div className="session-panel__feedback">
+          {viewState.errorMessage ? (
+            <p className="session-panel__msg session-panel__msg--error">
+              {viewState.errorMessage}
+            </p>
+          ) : !setActive && savedSessionInsight ? (
+            <div className="session-recap" aria-live="polite">
+              <span className="eyebrow">Set saved</span>
+              <strong className="session-recap__summary">
+                {savedSessionInsight.reps} reps &middot; {formatAnalysisScore(savedSessionInsight.avgQualityScore)}
+              </strong>
+              <p className="session-recap__note">{getFormTakeaway(savedSessionInsight)}</p>
+            </div>
+          ) : viewState.status !== 'ready' && viewState.guidance ? (
+            <p className="session-panel__msg">{viewState.guidance}</p>
+          ) : null}
+        </div>
+
+        {/* Push actions to bottom */}
+        <div className="session-panel__spacer" />
+
+        {/* Primary action + corrections */}
+        <div className="session-panel__actions">
           {setActive ? (
-            <button className="accent-button session-dock__primary-action" type="button" onClick={onEndSet}>
+            <button className="session-cta session-cta--save" type="button" onClick={onEndSet}>
               Save set
             </button>
           ) : (
-            <button className="accent-button session-dock__primary-action" type="button" onClick={onStartWorkout}>
+            <button className="session-cta" type="button" onClick={onStartWorkout}>
               Start set
             </button>
           )}
-          <button className="manual-button" type="button" onClick={() => onAdjustSet(1)} disabled={!setActive}>
-            +1
+          <div className="session-nudge">
+            <button
+              className="session-nudge__btn"
+              type="button"
+              onClick={() => onAdjustSet(1)}
+              disabled={!setActive}
+            >
+              +1
+            </button>
+            <button
+              className="session-nudge__btn"
+              type="button"
+              onClick={() => onAdjustSet(-1)}
+              disabled={!setActive}
+            >
+              &minus;1
+            </button>
+          </div>
+        </div>
+
+        {/* Camera controls */}
+        <div className="session-cam-row">
+          <button className="session-cam-btn" type="button" onClick={onToggleCamera}>
+            {viewState.isCameraRunning ? 'Stop' : 'Start camera'}
           </button>
-          <button className="manual-button" type="button" onClick={() => onAdjustSet(-1)} disabled={!setActive}>
-            -1
+          <button className="session-cam-btn" type="button" onClick={onFlipCamera}>
+            Flip
           </button>
         </div>
-      </section>
+
+      </aside>
     </section>
   );
 }

@@ -142,6 +142,7 @@ export default function App() {
             }
             onAdjustSet={adjustCurrentSet}
             savedSessionInsight={savedSessionInsight}
+            streak={summary.streak}
           />
         ) : null}
 
