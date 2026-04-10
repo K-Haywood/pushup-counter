@@ -21,7 +21,18 @@ interface CameraScreenProps {
 }
 
 function formatStatusLabel(status: string) {
-  return status.replace('-', ' ');
+  const labels: Record<string, string> = {
+    ready: 'Tracking',
+    loading: 'Loading',
+    'camera-stopped': 'Camera off',
+    'camera-error': 'Camera issue',
+    'no-person': 'Finding you',
+    'multiple-people': 'One person only',
+    'low-confidence': 'Hold steady',
+    'bad-angle': 'Adjust view'
+  };
+
+  return labels[status] ?? status.replace('-', ' ');
 }
 
 export function CameraScreen({
@@ -77,6 +88,15 @@ export function CameraScreen({
               <small className="session-rail__hint">
                 {setActive ? PHASE_LABELS[viewState.phase] : 'Ready to start'}
               </small>
+              <div className="session-rail__progress" aria-label="Rep progress">
+                <span className="session-rail__progress-label">Rep progress</span>
+                <div className="progress-track session-rail__progress-track" aria-hidden="true">
+                  <span
+                    className="progress-track__fill session-rail__progress-fill"
+                    style={{ width: `${Math.round(viewState.repProgress * 100)}%` }}
+                  />
+                </div>
+              </div>
             </div>
 
             <div className="session-rail__chips">

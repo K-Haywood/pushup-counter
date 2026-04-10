@@ -40,6 +40,7 @@ export const INITIAL_SESSION_VIEW_STATE: PoseSessionViewState = {
   selectedSide: null,
   elbowAngle: null,
   smoothedAngle: null,
+  repProgress: 0,
   calibrationSnapshot: null,
   calibrationActive: false,
   calibrationProgress: 0,

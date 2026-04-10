@@ -173,6 +173,7 @@ export interface PoseSessionViewState {
   selectedSide: BodySide | null;
   elbowAngle: number | null;
   smoothedAngle: number | null;
+  repProgress: number;
   calibrationSnapshot: CalibrationSnapshot | null;
   calibrationActive: boolean;
   calibrationProgress: number;

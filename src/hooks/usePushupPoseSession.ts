@@ -9,10 +9,18 @@ import type {
   CalibrationSnapshot,
   CameraDeviceOption,
   PoseFrameMetrics,
+  PoseStatus,
   PoseSessionViewState
 } from '../types/app';
 
 const INFERENCE_INTERVAL_MS = 70;
+const READY_RECOVERY_DELAY_MS = 140;
+const WARNING_STATUS_DELAY_MS = 280;
+const PERSON_STATUS_DELAY_MS = 620;
+const SECONDARY_PERSON_STATUS_DELAY_MS = 420;
+const MOTION_PROGRESS_HOLD_MS = 320;
+const MOTION_PROGRESS_DECAY = 0.84;
+const MOTION_PROGRESS_BLEND = 0.6;
 
 interface UsePushupPoseSessionOptions {
   settings: AppSettings;
@@ -24,6 +32,47 @@ interface CalibrationDraft {
   active: boolean;
   holdStart: number | null;
   samples: PoseFrameMetrics[];
+}
+
+interface StatusTransitionState {
+  displayedStatus: PoseStatus;
+  displayedGuidance: string;
+  candidateStatus: PoseStatus | null;
+  candidateGuidance: string;
+  candidateSince: number;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function getStatusDelay(currentStatus: PoseStatus, nextStatus: PoseStatus): number {
+  if (nextStatus === currentStatus) {
+    return 0;
+  }
+
+  switch (nextStatus) {
+    case 'ready':
+      return READY_RECOVERY_DELAY_MS;
+    case 'no-person':
+      return PERSON_STATUS_DELAY_MS;
+    case 'multiple-people':
+      return currentStatus === 'ready' ? PERSON_STATUS_DELAY_MS : SECONDARY_PERSON_STATUS_DELAY_MS;
+    case 'low-confidence':
+    case 'bad-angle':
+      return WARNING_STATUS_DELAY_MS;
+    default:
+      return 0;
+  }
+}
+
+function getRepProgress(smoothedAngle: number | null, settings: AppSettings): number | null {
+  if (smoothedAngle == null) {
+    return null;
+  }
+
+  const range = Math.max(settings.topThreshold - settings.bottomThreshold, 1);
+  return clamp((settings.topThreshold - smoothedAngle) / range, 0, 1);
 }
 
 async function listVideoInputs(): Promise<CameraDeviceOption[]> {
@@ -54,6 +103,15 @@ export function usePushupPoseSession({
     holdStart: null,
     samples: []
   });
+  const statusTransitionRef = useRef<StatusTransitionState>({
+    displayedStatus: INITIAL_SESSION_VIEW_STATE.status,
+    displayedGuidance: INITIAL_SESSION_VIEW_STATE.guidance,
+    candidateStatus: null,
+    candidateGuidance: '',
+    candidateSince: 0
+  });
+  const motionProgressRef = useRef(0);
+  const lastMotionAtRef = useRef(0);
   const hasSeenCameraPreferenceRef = useRef(false);
   const startCameraRef = useRef<() => Promise<void>>(async () => {});
   const settingsRef = useRef(settings);
@@ -72,11 +130,106 @@ export function usePushupPoseSession({
   }, [setActive, settings.topThreshold, settings.bottomThreshold, settings.smoothingFrames, settings.cooldownMs]);
 
   useEffect(() => {
+    const mountedVideo = videoRef.current;
+    const mountedOverlay = overlayRef.current;
+
     return () => {
-      void stopCamera();
+      if (animationFrameRef.current != null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+
+      const stream = streamRef.current;
+      if (stream) {
+        stream.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+
+      if (mountedVideo) {
+        mountedVideo.pause();
+        mountedVideo.srcObject = null;
+      }
+
+      if (mountedOverlay) {
+        const context = mountedOverlay.getContext('2d');
+        context?.clearRect(0, 0, mountedOverlay.width, mountedOverlay.height);
+      }
+
       poseLandmarkerRef.current?.close();
     };
   }, []);
+
+  function resetSessionUi(status: PoseStatus, guidance: string): void {
+    statusTransitionRef.current = {
+      displayedStatus: status,
+      displayedGuidance: guidance,
+      candidateStatus: null,
+      candidateGuidance: '',
+      candidateSince: 0
+    };
+    motionProgressRef.current = 0;
+    lastMotionAtRef.current = 0;
+  }
+
+  function resolveDisplayedStatus(status: PoseStatus, guidance: string, timestamp: number) {
+    const runtime = statusTransitionRef.current;
+
+    if (status === runtime.displayedStatus) {
+      runtime.displayedGuidance = guidance;
+      runtime.candidateStatus = null;
+      runtime.candidateGuidance = '';
+      runtime.candidateSince = 0;
+      return {
+        status: runtime.displayedStatus,
+        guidance: runtime.displayedGuidance
+      };
+    }
+
+    if (runtime.candidateStatus !== status) {
+      runtime.candidateStatus = status;
+      runtime.candidateGuidance = guidance;
+      runtime.candidateSince = timestamp;
+      return {
+        status: runtime.displayedStatus,
+        guidance: runtime.displayedGuidance
+      };
+    }
+
+    if (timestamp - runtime.candidateSince >= getStatusDelay(runtime.displayedStatus, status)) {
+      runtime.displayedStatus = status;
+      runtime.displayedGuidance = guidance;
+      runtime.candidateStatus = null;
+      runtime.candidateGuidance = '';
+      runtime.candidateSince = 0;
+    }
+
+    return {
+      status: runtime.displayedStatus,
+      guidance: runtime.displayedGuidance
+    };
+  }
+
+  function resolveRepProgress(smoothedAngle: number | null, timestamp: number): number {
+    const rawProgress = getRepProgress(smoothedAngle, settingsRef.current);
+
+    if (rawProgress != null) {
+      lastMotionAtRef.current = timestamp;
+      motionProgressRef.current =
+        motionProgressRef.current * (1 - MOTION_PROGRESS_BLEND) + rawProgress * MOTION_PROGRESS_BLEND;
+      return motionProgressRef.current;
+    }
+
+    if (timestamp - lastMotionAtRef.current <= MOTION_PROGRESS_HOLD_MS) {
+      return motionProgressRef.current;
+    }
+
+    motionProgressRef.current *= MOTION_PROGRESS_DECAY;
+    if (motionProgressRef.current < 0.02) {
+      motionProgressRef.current = 0;
+    }
+
+    return motionProgressRef.current;
+  }
 
   useEffect(() => {
     if (!hasSeenCameraPreferenceRef.current) {
@@ -99,8 +252,10 @@ export function usePushupPoseSession({
       isLoadingModel: true,
       status: 'loading',
       guidance: 'Loading on-device pose model...',
+      repProgress: 0,
       errorMessage: null
     }));
+    resetSessionUi('loading', 'Loading on-device pose model...');
 
     const wasmBaseUrl = new URL('./vendor/mediapipe/wasm', window.location.href).toString();
     const modelUrl = new URL('./models/pose_landmarker_lite.task', window.location.href).toString();
@@ -175,23 +330,30 @@ export function usePushupPoseSession({
       setCameraDevices(devices);
 
       counterStateRef.current = createCounterRuntimeState();
+      resetSessionUi(
+        'ready',
+        'Camera running. Face the camera and keep your chest, elbows, and at least one wrist visible.'
+      );
       setViewState((current) => ({
         ...current,
         isCameraRunning: true,
         status: 'ready',
         guidance: 'Camera running. Face the camera and keep your chest, elbows, and at least one wrist visible.',
+        repProgress: 0,
         errorMessage: null
       }));
 
       startLoop();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to start the camera.';
+      resetSessionUi('camera-error', 'Camera access failed. Check permissions and try again.');
       setViewState((current) => ({
         ...current,
         isCameraRunning: false,
         isLoadingModel: false,
         status: 'camera-error',
         guidance: 'Camera access failed. Check permissions and try again.',
+        repProgress: 0,
         errorMessage: message
       }));
     }
@@ -228,12 +390,14 @@ export function usePushupPoseSession({
       holdStart: null,
       samples: []
     };
+    resetSessionUi('camera-stopped', 'Start the camera to preview your pose.');
 
     setViewState((current) => ({
       ...current,
       isCameraRunning: false,
       status: 'camera-stopped',
       guidance: 'Start the camera to preview your pose.',
+      repProgress: 0,
       calibrationActive: false,
       calibrationProgress: 0,
       errorMessage: clearError ? null : current.errorMessage
@@ -404,6 +568,8 @@ export function usePushupPoseSession({
       setActiveRef.current
     );
     counterStateRef.current = update.state;
+    const displayedStatus = resolveDisplayedStatus(frame.status, frame.guidance, timestamp);
+    const repProgress = resolveRepProgress(update.smoothedAngle, timestamp);
 
     if (update.repCount > 0) {
       onRepCountedRef.current();
@@ -412,14 +578,15 @@ export function usePushupPoseSession({
 
     setViewState((current) => ({
       ...current,
-      status: frame.status,
-      guidance: frame.guidance,
+      status: displayedStatus.status,
+      guidance: current.calibrationActive ? current.guidance : displayedStatus.guidance,
       phase: update.phase,
       confidence: frame.confidence,
       confidenceLabel: frame.confidenceLabel,
       selectedSide: frame.side,
       elbowAngle: frame.elbowAngle,
       smoothedAngle: update.smoothedAngle,
+      repProgress,
       calibrationSnapshot: calibrationSnapshotRef.current
     }));
   }

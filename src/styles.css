@@ -545,6 +545,26 @@ button {
   font-size: 0.8rem;
 }
 
+.session-rail__progress {
+  margin-top: 0.5rem;
+  display: grid;
+  gap: 0.3rem;
+}
+
+.session-rail__progress-label {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.session-rail__progress-track {
+  height: 0.58rem;
+  background: rgba(148, 163, 184, 0.14);
+}
+
+.session-rail__progress-fill {
+  transition: width 110ms linear;
+}
+
 .session-rail__chips {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1036,6 +1056,10 @@ button {
   .session-rail__camera-mode,
   .session-rail__chips .inline-badge {
     font-size: 0.76rem;
+  }
+
+  .session-rail__progress-label {
+    font-size: 0.68rem;
   }
 
   .primary-button,
