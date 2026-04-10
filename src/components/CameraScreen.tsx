@@ -1,5 +1,11 @@
 import { PHASE_LABELS } from '../lib/defaults';
-import type { CameraFacingMode, PoseSessionViewState, SetRecord } from '../types/app';
+import {
+  formatAnalysisDurationMs,
+  formatAnalysisPercent,
+  formatAnalysisScore,
+  getFormTakeaway
+} from '../lib/formInsights';
+import type { CameraFacingMode, PoseSessionViewState, RecentSetInsight, SetRecord } from '../types/app';
 
 interface CameraScreenProps {
   currentSet: SetRecord | null;
@@ -16,7 +22,7 @@ interface CameraScreenProps {
   onEndSet: () => void;
   onFlipCamera: () => void;
   onAdjustSet: (delta: number) => void;
-  savedSetMessage: string | null;
+  savedSessionInsight: RecentSetInsight | null;
   currentFacingMode: CameraFacingMode;
 }
 
@@ -50,18 +56,12 @@ export function CameraScreen({
   onEndSet,
   onFlipCamera,
   onAdjustSet,
-  savedSetMessage,
+  savedSessionInsight,
   currentFacingMode
 }: CameraScreenProps) {
   const helperMessage =
-    savedSetMessage ??
-    viewState.errorMessage ??
-    (viewState.status !== 'ready' || viewState.calibrationActive ? viewState.guidance : null);
-  const helperClassName = savedSetMessage
-    ? 'camera-stage__saved'
-    : viewState.errorMessage
-      ? 'camera-stage__error'
-      : 'camera-stage__guidance';
+    viewState.errorMessage ?? (viewState.status !== 'ready' || viewState.calibrationActive ? viewState.guidance : null);
+  const helperClassName = viewState.errorMessage ? 'camera-stage__error' : 'camera-stage__guidance';
 
   return (
     <section className="screen screen--camera">
@@ -112,6 +112,28 @@ export function CameraScreen({
             </div>
           </aside>
         </div>
+
+        {!setActive && savedSessionInsight ? (
+          <article className="session-summary-card" aria-live="polite">
+            <div className="session-summary-card__header">
+              <div>
+                <span className="session-summary-card__eyebrow">Set saved</span>
+                <strong className="session-summary-card__title">{savedSessionInsight.reps} reps</strong>
+              </div>
+              <span className="session-summary-card__score">
+                {formatAnalysisScore(savedSessionInsight.avgQualityScore)}
+              </span>
+            </div>
+            <p className="session-summary-card__copy">{getFormTakeaway(savedSessionInsight)}</p>
+            <div className="session-summary-card__chips">
+              <span className="inline-badge">Depth {formatAnalysisPercent(savedSessionInsight.avgDepth)}</span>
+              <span className="inline-badge">Tempo {formatAnalysisDurationMs(savedSessionInsight.avgCycleMs)}</span>
+              <span className="inline-badge">
+                Consistency {formatAnalysisScore(savedSessionInsight.consistencyScore)}
+              </span>
+            </div>
+          </article>
+        ) : null}
 
         <div className="session-feedback">
           {helperMessage ? <p className={helperClassName}>{helperMessage}</p> : null}

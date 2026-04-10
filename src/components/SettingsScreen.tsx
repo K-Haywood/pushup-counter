@@ -220,6 +220,7 @@ export function SettingsScreen({
       <section className="panel panel--tight">
         <p className="eyebrow">App build</p>
         <p className="subtle-copy">Installed build: {buildLabel}</p>
+        <p className="subtle-copy">All reps, sets, and form history stay local on this device.</p>
       </section>
     </section>
   );

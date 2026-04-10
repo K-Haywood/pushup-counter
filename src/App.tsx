@@ -4,14 +4,15 @@ import { CameraScreen } from './components/CameraScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { usePersistentAppState } from './hooks/usePersistentAppState';
+import { buildSetInsight } from './lib/storage';
 import { usePushupPoseSession } from './hooks/usePushupPoseSession';
-import type { AppTab } from './types/app';
+import type { AppTab, RecentSetInsight } from './types/app';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<AppTab>('camera');
   const [updateRegistration, setUpdateRegistration] = useState<ServiceWorkerRegistration | null>(null);
   const [isApplyingUpdate, setIsApplyingUpdate] = useState(false);
-  const [savedSetMessage, setSavedSetMessage] = useState<string | null>(null);
+  const [savedSessionInsight, setSavedSessionInsight] = useState<RecentSetInsight | null>(null);
   const buildLabel = new Date(__APP_BUILD__).toLocaleString([], {
     year: 'numeric',
     month: 'short',
@@ -24,11 +25,7 @@ export default function App() {
     today,
     currentSet,
     summary,
-    last7Days,
-    last30Days,
     progress,
-    storageStatus,
-    lastSavedAt,
     startSet,
     endSet,
     addAutoRep,
@@ -59,18 +56,6 @@ export default function App() {
       window.removeEventListener('pushup-counter:new-version-available', handleUpdateReady as EventListener);
     };
   }, []);
-
-  useEffect(() => {
-    if (!savedSetMessage) {
-      return;
-    }
-
-    const timeout = window.setTimeout(() => {
-      setSavedSetMessage(null);
-    }, 3200);
-
-    return () => window.clearTimeout(timeout);
-  }, [savedSetMessage]);
 
   function applyUpdate() {
     if (updateRegistration?.waiting) {
@@ -131,12 +116,13 @@ export default function App() {
                 poseSession.startCalibration();
               }
 
+              setSavedSessionInsight(null);
               startSet();
             }}
             onEndSet={() => {
-              const reps = currentSet?.reps ?? 0;
+              const latestInsight = currentSet ? buildSetInsight(today.date, currentSet) : null;
               endSet();
-              setSavedSetMessage(reps > 0 ? `Set saved: ${reps} reps` : 'Set saved');
+              setSavedSessionInsight(latestInsight);
             }}
             onFlipCamera={() =>
               updateSettings({
@@ -146,19 +132,12 @@ export default function App() {
               })
             }
             onAdjustSet={adjustCurrentSet}
-            savedSetMessage={savedSetMessage}
+            savedSessionInsight={savedSessionInsight}
           />
         ) : null}
 
         {activeTab === 'history' ? (
-          <HistoryScreen
-            last7Days={last7Days}
-            last30Days={last30Days}
-            progress={progress}
-            streakSnapshot={state.streakSnapshot}
-            storageStatus={storageStatus}
-            lastSavedAt={lastSavedAt}
-          />
+          <HistoryScreen progress={progress} streakSnapshot={state.streakSnapshot} />
         ) : null}
 
         {activeTab === 'settings' ? (

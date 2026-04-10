@@ -476,7 +476,7 @@ function summarizeFormAnalyticsForSets(sets: SetRecord[]): FormAnalyticsSummary 
   return summarizeRepAnalytics(sets.flatMap((set) => set.repAnalytics));
 }
 
-function buildRecentSetInsight(date: string, set: SetRecord): RecentSetInsight {
+export function buildSetInsight(date: string, set: SetRecord): RecentSetInsight {
   const summary = summarizeRepAnalytics(set.repAnalytics);
 
   return {
@@ -628,7 +628,7 @@ export function buildProgressSnapshot(
       month: summarizeFormAnalyticsForSets(monthSets),
       lifetime: summarizeFormAnalyticsForSets(lifetimeTrackedSets.map((entry) => entry.set)),
       recentSets: lifetimeTrackedSets
-        .map(({ date, set }) => buildRecentSetInsight(date, set))
+        .map(({ date, set }) => buildSetInsight(date, set))
         .sort(
           (left, right) =>
             Date.parse(right.endedAt ?? right.startedAt) - Date.parse(left.endedAt ?? left.startedAt)
