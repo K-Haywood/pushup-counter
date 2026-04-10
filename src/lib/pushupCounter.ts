@@ -247,7 +247,7 @@ function isFramedWell(landmarks: Landmark[]): boolean {
   const minY = Math.min(...relevant.map((point) => point.y));
   const maxY = Math.max(...relevant.map((point) => point.y));
 
-  return minX > 0.01 && maxX < 0.99 && minY > 0.01 && maxY < 0.995;
+  return minX > 0.005 && maxX < 0.995 && minY > 0.005 && maxY < 0.998;
 }
 
 function getConfidenceLabel(confidence: number): 'high' | 'medium' | 'low' {
@@ -376,10 +376,10 @@ export function analyzePoseFrame(
   const calibrationScale = calibration && bodyScale > 0 ? bodyScale / calibration.bodyScale : 1;
   const calibrationOkay =
     !calibration ||
-    ((!hipsReliable || (calibrationScale >= 0.48 && calibrationScale <= 2.05)) ||
+    (((!hipsReliable || (calibrationScale >= 0.4 && calibrationScale <= 2.5)) ||
       shouldersVisible < settings.minLandmarkVisibility) &&
-      shoulderWidthRatio >= calibration.shoulderWidthRatio * 0.34 &&
-      shoulderWidthRatio <= calibration.shoulderWidthRatio * 2.15;
+      shoulderWidthRatio >= calibration.shoulderWidthRatio * 0.22 &&
+      shoulderWidthRatio <= calibration.shoulderWidthRatio * 3);
 
   const visibilityScore = clamp(
     (visibilityRaw - settings.minLandmarkVisibility) /
@@ -412,6 +412,16 @@ export function analyzePoseFrame(
     1
   );
 
+  const readinessScore = clamp(
+    visibilityScore * 0.52 +
+      alignmentScore * 0.14 +
+      frontViewScore * 0.16 +
+      symmetryScore * 0.1 +
+      framingScore * 0.08,
+    0,
+    1
+  );
+
   let status: PoseFrameMetrics['status'] = 'ready';
   let guidance = calibration
     ? 'Front-on view locked. Start counting when ready.'
@@ -422,19 +432,19 @@ export function analyzePoseFrame(
     guidance = 'Improve lighting and keep both elbows and wrists visible.';
   } else if (!framedWell) {
     status = 'bad-angle';
-    guidance = 'Keep your upper body inside the frame and leave some margin around your arms.';
-  } else if (!frontFacingEnough) {
-    status = 'bad-angle';
-    guidance = 'Face the camera directly and move slightly closer if your shoulders look narrow.';
-  } else if (!symmetryGood) {
-    status = 'bad-angle';
-    guidance = 'Try to keep both elbows visible, but the app can still count from the clearer arm.';
-  } else if (!alignmentGood) {
-    status = 'bad-angle';
-    guidance = 'Square your shoulders to the camera and avoid leaning to one side.';
+    guidance = 'Keep your shoulders, elbows, and at least one wrist visible.';
   } else if (!calibrationOkay) {
     status = 'bad-angle';
     guidance = 'Return to roughly the same distance you used during calibration.';
+  } else if (readinessScore < 0.42) {
+    status = 'bad-angle';
+    guidance = 'Improve shoulder alignment and keep the movement in a steady line.';
+  } else if (!frontFacingEnough) {
+    guidance = 'Face the camera a little more squarely for steadier counting.';
+  } else if (!symmetryGood) {
+    guidance = 'Keep both elbows visible when you can, but counting can still continue.';
+  } else if (!alignmentGood) {
+    guidance = 'Try to keep your shoulders level for cleaner rep quality.';
   }
 
   return {
