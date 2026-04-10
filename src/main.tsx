@@ -53,16 +53,12 @@ async function registerServiceWorker() {
     });
 
     window.addEventListener('focus', () => {
-      void registration.update().catch((error) => {
-        console.warn('Service worker update check failed', error);
-      });
+      void registration.update().catch(() => {});
     });
 
-    void registration.update().catch((error) => {
-      console.warn('Service worker update check failed', error);
-    });
-  } catch (error) {
-    console.warn('Service worker registration failed', error);
+    void registration.update().catch(() => {});
+  } catch {
+    // Service worker not supported or blocked — app works without it
   }
 }
 

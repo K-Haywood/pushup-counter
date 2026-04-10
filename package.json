@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json && vite build",
+    "postbuild": "node -e \"const fs=require('fs'),p=require('path'),d='./dist/assets';fs.readdirSync(d).filter(f=>f.endsWith('.map')).forEach(f=>fs.unlinkSync(p.join(d,f)))\"",
     "lint": "eslint .",
     "preview": "vite preview"
   },

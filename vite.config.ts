@@ -10,9 +10,10 @@ export default defineConfig({
   },
   plugins: [react()],
   build: {
-    sourcemap: true,
+    sourcemap: false,
     rollupOptions: {
       output: {
+        sourcemap: false,
         entryFileNames: 'assets/app.js',
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]'
