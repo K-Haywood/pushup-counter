@@ -3,6 +3,7 @@ import { BottomNav } from './components/BottomNav';
 import { CameraScreen } from './components/CameraScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { SettingsScreen } from './components/SettingsScreen';
+import { useAccountSync } from './hooks/useAccountSync';
 import { usePersistentAppState } from './hooks/usePersistentAppState';
 import { buildSetInsight } from './lib/storage';
 import { usePushupPoseSession } from './hooks/usePushupPoseSession';
@@ -28,12 +29,18 @@ export default function App() {
     last7Days,
     last30Days,
     progress,
+    replaceState,
     startSet,
     endSet,
     addAutoRep,
     adjustCurrentSet,
     updateSettings
   } = usePersistentAppState();
+
+  const account = useAccountSync({
+    state,
+    replaceState
+  });
 
   const poseSession = usePushupPoseSession({
     settings: state.settings,
@@ -152,6 +159,10 @@ export default function App() {
             settings={state.settings}
             cameras={poseSession.cameraDevices}
             buildLabel={buildLabel}
+            account={account.account}
+            onSendMagicLink={account.sendMagicLink}
+            onSignOut={account.signOut}
+            onSyncNow={account.syncNow}
             onUpdateSettings={updateSettings}
           />
         ) : null}

@@ -93,6 +93,7 @@ export interface StoredAppState {
   days: Record<string, DayRecord>;
   session: SessionState;
   streakSnapshot: StreakSnapshot;
+  updatedAt: string;
 }
 
 export interface DashboardSummary {
@@ -229,5 +230,16 @@ export interface PoseSessionViewState {
   calibrationSnapshot: CalibrationSnapshot | null;
   calibrationActive: boolean;
   calibrationProgress: number;
+  errorMessage: string | null;
+}
+
+export interface AccountSessionState {
+  isConfigured: boolean;
+  isLoading: boolean;
+  isSignedIn: boolean;
+  userEmail: string | null;
+  syncStatus: 'disabled' | 'loading' | 'idle' | 'syncing' | 'synced' | 'error';
+  lastSyncedAt: string | null;
+  statusMessage: string;
   errorMessage: string | null;
 }

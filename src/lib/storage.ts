@@ -120,6 +120,177 @@ function migrateRecentNumberSetting(
   return resolved;
 }
 
+function normalizeStoredState(parsed: Partial<StoredAppState>): StoredAppState {
+  const base = createEmptyStoredState();
+  const parsedVersion = ensureNumber(parsed.version, APP_STATE_VERSION);
+
+  const settings: AppSettings = {
+    defaultDailyGoal: ensureNumber(parsed.settings?.defaultDailyGoal, DEFAULT_SETTINGS.defaultDailyGoal),
+    soundEnabled: ensureBoolean(parsed.settings?.soundEnabled, DEFAULT_SETTINGS.soundEnabled),
+    vibrationEnabled: ensureBoolean(parsed.settings?.vibrationEnabled, DEFAULT_SETTINGS.vibrationEnabled),
+    cameraFacingMode: parsed.settings?.cameraFacingMode === 'user' ? 'user' : 'environment',
+    preferredCameraId:
+      typeof parsed.settings?.preferredCameraId === 'string' ? parsed.settings.preferredCameraId : null,
+    smoothingFrames: migrateRecentNumberSetting(
+      migrateLegacyNumberSetting(parsed.settings?.smoothingFrames, DEFAULT_SETTINGS.smoothingFrames, 5, parsedVersion),
+      DEFAULT_SETTINGS.smoothingFrames,
+      4,
+      parsedVersion,
+      3
+    ),
+    topThreshold: migrateRecentNumberSetting(
+      migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(parsed.settings?.topThreshold, DEFAULT_SETTINGS.topThreshold, 155, parsedVersion),
+        DEFAULT_SETTINGS.topThreshold,
+        142,
+        parsedVersion,
+        4
+      ),
+      DEFAULT_SETTINGS.topThreshold,
+      138,
+      parsedVersion,
+      6
+    ),
+    bottomThreshold: migrateRecentNumberSetting(
+      migrateRecentNumberSetting(
+        migrateLegacyNumberSetting(parsed.settings?.bottomThreshold, DEFAULT_SETTINGS.bottomThreshold, 95, parsedVersion),
+        DEFAULT_SETTINGS.bottomThreshold,
+        118,
+        parsedVersion,
+        4
+      ),
+      DEFAULT_SETTINGS.bottomThreshold,
+      122,
+      parsedVersion,
+      6
+    ),
+    minLandmarkVisibility: migrateRecentNumberSetting(
+      migrateLegacyNumberSetting(
+        parsed.settings?.minLandmarkVisibility,
+        DEFAULT_SETTINGS.minLandmarkVisibility,
+        0.65,
+        parsedVersion
+      ),
+      DEFAULT_SETTINGS.minLandmarkVisibility,
+      0.45,
+      parsedVersion,
+      4
+    ),
+    bodyAlignmentTolerance: migrateRecentNumberSetting(
+      migrateLegacyNumberSetting(
+        parsed.settings?.bodyAlignmentTolerance,
+        DEFAULT_SETTINGS.bodyAlignmentTolerance,
+        0.12,
+        parsedVersion
+      ),
+      DEFAULT_SETTINGS.bodyAlignmentTolerance,
+      0.18,
+      parsedVersion,
+      3
+    ),
+    sideViewMaxRatio: ensureNumber(parsed.settings?.sideViewMaxRatio, DEFAULT_SETTINGS.sideViewMaxRatio),
+    frontViewMinRatio: migrateRecentNumberSetting(
+      migrateLegacyNumberSetting(
+        parsed.settings?.frontViewMinRatio,
+        DEFAULT_SETTINGS.frontViewMinRatio,
+        0.55,
+        parsedVersion
+      ),
+      DEFAULT_SETTINGS.frontViewMinRatio,
+      0.42,
+      parsedVersion,
+      3
+    ),
+    armSymmetryTolerance: migrateRecentNumberSetting(
+      migrateLegacyNumberSetting(
+        parsed.settings?.armSymmetryTolerance,
+        DEFAULT_SETTINGS.armSymmetryTolerance,
+        0.14,
+        parsedVersion
+      ),
+      DEFAULT_SETTINGS.armSymmetryTolerance,
+      0.28,
+      parsedVersion,
+      3
+    ),
+    cooldownMs: migrateRecentNumberSetting(
+      migrateLegacyNumberSetting(parsed.settings?.cooldownMs, DEFAULT_SETTINGS.cooldownMs, 650, parsedVersion),
+      DEFAULT_SETTINGS.cooldownMs,
+      700,
+      parsedVersion,
+      3
+    ),
+    calibrationHoldMs: migrateRecentNumberSetting(
+      migrateLegacyNumberSetting(
+        parsed.settings?.calibrationHoldMs,
+        DEFAULT_SETTINGS.calibrationHoldMs,
+        1200,
+        parsedVersion
+      ),
+      DEFAULT_SETTINGS.calibrationHoldMs,
+      900,
+      parsedVersion,
+      3
+    )
+  };
+
+  const days = Object.fromEntries(
+    Object.entries(parsed.days ?? {}).map(([date, value]) => {
+      const day = value as Partial<DayRecord>;
+      return [
+        date,
+        {
+          date,
+          dailyGoal: ensureNumber(day.dailyGoal, settings.defaultDailyGoal),
+          totalReps: ensureNumber(day.totalReps, 0),
+          updatedAt: typeof day.updatedAt === 'string' ? day.updatedAt : new Date().toISOString(),
+          sets: (day.sets ?? []).map((set) => ({
+            id: typeof set.id === 'string' ? set.id : generateId('set'),
+            startedAt: typeof set.startedAt === 'string' ? set.startedAt : new Date().toISOString(),
+            endedAt: typeof set.endedAt === 'string' ? set.endedAt : null,
+            reps: ensureNumber(set.reps, 0),
+            autoCountedReps: ensureNumber(set.autoCountedReps, 0),
+            manualAdjustments: ensureNumber(set.manualAdjustments, 0),
+            corrections: (set.corrections ?? []).map((correction) => ({
+              id: typeof correction.id === 'string' ? correction.id : generateId('correction'),
+              timestamp:
+                typeof correction.timestamp === 'string' ? correction.timestamp : new Date().toISOString(),
+              delta: ensureNumber(correction.delta, 0),
+              reason: correction.reason === 'reset' ? 'reset' : 'manual'
+            })),
+            repAnalytics: (set.repAnalytics ?? []).map((rep) => toRepAnalysis(rep))
+          }))
+        } satisfies DayRecord
+      ];
+    })
+  );
+
+  return {
+    version: APP_STATE_VERSION,
+    settings,
+    days,
+    session: {
+      activeSetId: typeof parsed.session?.activeSetId === 'string' ? parsed.session.activeSetId : null,
+      activeDate: typeof parsed.session?.activeDate === 'string' ? parsed.session.activeDate : null
+    },
+    streakSnapshot: parsed.streakSnapshot ?? base.streakSnapshot,
+    updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : new Date().toISOString()
+  };
+}
+
+export function deserializeStoredState(raw: string): StoredAppState | null {
+  try {
+    const parsed = JSON.parse(raw) as Partial<StoredAppState>;
+    return normalizeStoredState(parsed);
+  } catch {
+    return null;
+  }
+}
+
+export function serializeStoredState(state: StoredAppState): string {
+  return JSON.stringify(state);
+}
+
 export function loadStoredState(storageKey: string): StoredAppState {
   if (typeof window === 'undefined') {
     return createEmptyStoredState();
@@ -130,187 +301,7 @@ export function loadStoredState(storageKey: string): StoredAppState {
     return createEmptyStoredState();
   }
 
-  try {
-    const parsed = JSON.parse(raw) as Partial<StoredAppState>;
-    const base = createEmptyStoredState();
-    const parsedVersion = ensureNumber(parsed.version, APP_STATE_VERSION);
-
-    const settings: AppSettings = {
-      defaultDailyGoal: ensureNumber(parsed.settings?.defaultDailyGoal, DEFAULT_SETTINGS.defaultDailyGoal),
-      soundEnabled: ensureBoolean(parsed.settings?.soundEnabled, DEFAULT_SETTINGS.soundEnabled),
-      vibrationEnabled: ensureBoolean(parsed.settings?.vibrationEnabled, DEFAULT_SETTINGS.vibrationEnabled),
-      cameraFacingMode: parsed.settings?.cameraFacingMode === 'user' ? 'user' : 'environment',
-      preferredCameraId:
-        typeof parsed.settings?.preferredCameraId === 'string' ? parsed.settings.preferredCameraId : null,
-      smoothingFrames: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.smoothingFrames,
-          DEFAULT_SETTINGS.smoothingFrames,
-          5,
-          parsedVersion
-        ),
-        DEFAULT_SETTINGS.smoothingFrames,
-        4,
-        parsedVersion,
-        3
-      ),
-      topThreshold: migrateRecentNumberSetting(
-        migrateRecentNumberSetting(
-          migrateLegacyNumberSetting(
-            parsed.settings?.topThreshold,
-            DEFAULT_SETTINGS.topThreshold,
-            155,
-            parsedVersion
-          ),
-          DEFAULT_SETTINGS.topThreshold,
-          142,
-          parsedVersion,
-          4
-        ),
-        DEFAULT_SETTINGS.topThreshold,
-        138,
-        parsedVersion,
-        6
-      ),
-      bottomThreshold: migrateRecentNumberSetting(
-        migrateRecentNumberSetting(
-          migrateLegacyNumberSetting(
-            parsed.settings?.bottomThreshold,
-            DEFAULT_SETTINGS.bottomThreshold,
-            95,
-            parsedVersion
-          ),
-          DEFAULT_SETTINGS.bottomThreshold,
-          118,
-          parsedVersion,
-          4
-        ),
-        DEFAULT_SETTINGS.bottomThreshold,
-        122,
-        parsedVersion,
-        6
-      ),
-      minLandmarkVisibility: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.minLandmarkVisibility,
-          DEFAULT_SETTINGS.minLandmarkVisibility,
-          0.65,
-          parsedVersion
-        ),
-        DEFAULT_SETTINGS.minLandmarkVisibility,
-        0.45,
-        parsedVersion,
-        4
-      ),
-      bodyAlignmentTolerance: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.bodyAlignmentTolerance,
-          DEFAULT_SETTINGS.bodyAlignmentTolerance,
-          0.12,
-          parsedVersion
-        ),
-        DEFAULT_SETTINGS.bodyAlignmentTolerance,
-        0.18,
-        parsedVersion,
-        3
-      ),
-      sideViewMaxRatio: ensureNumber(parsed.settings?.sideViewMaxRatio, DEFAULT_SETTINGS.sideViewMaxRatio),
-      frontViewMinRatio: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.frontViewMinRatio,
-          DEFAULT_SETTINGS.frontViewMinRatio,
-          0.55,
-          parsedVersion
-        ),
-        DEFAULT_SETTINGS.frontViewMinRatio,
-        0.42,
-        parsedVersion,
-        3
-      ),
-      armSymmetryTolerance: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.armSymmetryTolerance,
-          DEFAULT_SETTINGS.armSymmetryTolerance,
-          0.14,
-          parsedVersion
-        ),
-        DEFAULT_SETTINGS.armSymmetryTolerance,
-        0.28,
-        parsedVersion,
-        3
-      ),
-      cooldownMs: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.cooldownMs,
-          DEFAULT_SETTINGS.cooldownMs,
-          650,
-          parsedVersion
-        ),
-        DEFAULT_SETTINGS.cooldownMs,
-        700,
-        parsedVersion,
-        3
-      ),
-      calibrationHoldMs: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.calibrationHoldMs,
-          DEFAULT_SETTINGS.calibrationHoldMs,
-          1200,
-          parsedVersion
-        ),
-        DEFAULT_SETTINGS.calibrationHoldMs,
-        900,
-        parsedVersion,
-        3
-      )
-    };
-
-    const days = Object.fromEntries(
-      Object.entries(parsed.days ?? {}).map(([date, value]) => {
-        const day = value as Partial<DayRecord>;
-        return [
-          date,
-          {
-            date,
-            dailyGoal: ensureNumber(day.dailyGoal, settings.defaultDailyGoal),
-            totalReps: ensureNumber(day.totalReps, 0),
-            updatedAt: typeof day.updatedAt === 'string' ? day.updatedAt : new Date().toISOString(),
-            sets: (day.sets ?? []).map((set) => ({
-              id: typeof set.id === 'string' ? set.id : generateId('set'),
-              startedAt: typeof set.startedAt === 'string' ? set.startedAt : new Date().toISOString(),
-              endedAt: typeof set.endedAt === 'string' ? set.endedAt : null,
-              reps: ensureNumber(set.reps, 0),
-              autoCountedReps: ensureNumber(set.autoCountedReps, 0),
-              manualAdjustments: ensureNumber(set.manualAdjustments, 0),
-              corrections: (set.corrections ?? []).map((correction) => ({
-                id: typeof correction.id === 'string' ? correction.id : generateId('correction'),
-                timestamp:
-                  typeof correction.timestamp === 'string'
-                    ? correction.timestamp
-                    : new Date().toISOString(),
-                delta: ensureNumber(correction.delta, 0),
-                reason: correction.reason === 'reset' ? 'reset' : 'manual'
-              })),
-              repAnalytics: (set.repAnalytics ?? []).map((rep) => toRepAnalysis(rep))
-            }))
-          } satisfies DayRecord
-        ];
-      })
-    );
-
-    return {
-      version: APP_STATE_VERSION,
-      settings,
-      days,
-      session: {
-        activeSetId: typeof parsed.session?.activeSetId === 'string' ? parsed.session.activeSetId : null,
-        activeDate: typeof parsed.session?.activeDate === 'string' ? parsed.session.activeDate : null
-      },
-      streakSnapshot: parsed.streakSnapshot ?? base.streakSnapshot
-    };
-  } catch {
-    return createEmptyStoredState();
-  }
+  return deserializeStoredState(raw) ?? createEmptyStoredState();
 }
 
 export function saveStoredState(storageKey: string, state: StoredAppState): void {
@@ -318,7 +309,7 @@ export function saveStoredState(storageKey: string, state: StoredAppState): void
     return;
   }
 
-  window.localStorage.setItem(storageKey, JSON.stringify(state));
+  window.localStorage.setItem(storageKey, serializeStoredState(state));
 }
 
 export async function loadStoredStateFromIndexedDb(): Promise<StoredAppState | null> {
@@ -343,9 +334,7 @@ export async function loadStoredStateFromIndexedDb(): Promise<StoredAppState | n
       }
 
       try {
-        window.localStorage.setItem('pushup-counter:indexeddb-import', rawState.payload);
-        resolve(loadStoredState('pushup-counter:indexeddb-import'));
-        window.localStorage.removeItem('pushup-counter:indexeddb-import');
+        resolve(deserializeStoredState(rawState.payload));
       } catch (error) {
         reject(error);
       }
@@ -389,9 +378,14 @@ export async function saveStoredStateToIndexedDb(state: StoredAppState): Promise
 }
 
 export function getLatestUpdatedAt(state: StoredAppState): string | null {
+  const stateTimestamp = Date.parse(state.updatedAt);
   const timestamps = Object.values(state.days)
     .map((day) => Date.parse(day.updatedAt))
     .filter((value) => Number.isFinite(value));
+
+  if (Number.isFinite(stateTimestamp)) {
+    timestamps.push(stateTimestamp);
+  }
 
   if (timestamps.length === 0) {
     return null;

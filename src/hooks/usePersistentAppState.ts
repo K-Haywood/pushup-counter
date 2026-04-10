@@ -89,6 +89,7 @@ export function usePersistentAppState() {
       }
 
       mutator(draft);
+      draft.updatedAt = new Date().toISOString();
       draft.streakSnapshot = computeStreakSnapshot(draft.days, getLocalDateKey());
       return draft;
     });
@@ -110,6 +111,14 @@ export function usePersistentAppState() {
     progress: buildProgressSnapshot(state),
     storageStatus,
     lastSavedAt,
+    replaceState(nextState: StoredAppState) {
+      setState(() => {
+        const draft = structuredClone(nextState) as StoredAppState;
+        draft.updatedAt = draft.updatedAt || new Date().toISOString();
+        draft.streakSnapshot = computeStreakSnapshot(draft.days, getLocalDateKey());
+        return draft;
+      });
+    },
     setTodayGoal(goal: number) {
       updateState((draft) => {
         const day = ensureDayRecord(draft, getLocalDateKey());

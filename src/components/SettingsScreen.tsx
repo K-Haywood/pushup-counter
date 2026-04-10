@@ -1,10 +1,15 @@
-import type { AppSettings, CameraDeviceOption } from '../types/app';
+import { useEffect, useState } from 'react';
+import type { AccountSessionState, AppSettings, CameraDeviceOption } from '../types/app';
 
 interface SettingsScreenProps {
   settings: AppSettings;
   cameras: CameraDeviceOption[];
   buildLabel: string;
+  account: AccountSessionState;
   onUpdateSettings: (patch: Partial<AppSettings>) => void;
+  onSendMagicLink: (email: string) => Promise<void>;
+  onSignOut: () => Promise<void>;
+  onSyncNow: () => Promise<void>;
 }
 
 function SliderField({
@@ -49,8 +54,34 @@ export function SettingsScreen({
   settings,
   cameras,
   buildLabel,
+  account,
+  onSendMagicLink,
+  onSignOut,
+  onSyncNow,
   onUpdateSettings
 }: SettingsScreenProps) {
+  const [email, setEmail] = useState(account.userEmail ?? '');
+  const [authNotice, setAuthNotice] = useState<string | null>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (account.userEmail) {
+      setEmail(account.userEmail);
+    }
+  }, [account.userEmail]);
+
+  async function handleSendMagicLink() {
+    setAuthError(null);
+    setAuthNotice(null);
+
+    try {
+      await onSendMagicLink(email);
+      setAuthNotice('Check your email for the sign-in link.');
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Could not send sign-in link.');
+    }
+  }
+
   return (
     <section className="screen">
       <header className="screen-header">
@@ -59,6 +90,65 @@ export function SettingsScreen({
           <h1>Quick preferences</h1>
         </div>
       </header>
+
+      <section className="panel form-panel">
+        <p className="eyebrow">Account</p>
+
+        {account.isConfigured ? (
+          account.isSignedIn ? (
+            <>
+              <div className="account-summary">
+                <strong>{account.userEmail ?? 'Signed in'}</strong>
+                <span>{account.statusMessage}</span>
+              </div>
+
+              <div className="inline-actions">
+                <button type="button" className="secondary-button" onClick={() => void onSyncNow()}>
+                  Sync now
+                </button>
+                <button type="button" className="secondary-button" onClick={() => void onSignOut()}>
+                  Sign out
+                </button>
+              </div>
+
+              <p className="subtle-copy">
+                Last synced {account.lastSyncedAt ? new Date(account.lastSyncedAt).toLocaleString() : 'just now'}.
+              </p>
+            </>
+          ) : (
+            <>
+              <label className="field">
+                <span>Email</span>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  inputMode="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                />
+              </label>
+
+              <div className="inline-actions">
+                <button type="button" className="primary-button" onClick={() => void handleSendMagicLink()}>
+                  Send sign-in link
+                </button>
+              </div>
+
+              <p className="subtle-copy">{account.statusMessage}</p>
+            </>
+          )
+        ) : (
+          <p className="subtle-copy">
+            Cloud sync is not configured yet. The app still works locally, but you can add Supabase later to let
+            multiple people sign in and keep their own progress.
+          </p>
+        )}
+
+        {authNotice ? <p className="subtle-copy is-success">{authNotice}</p> : null}
+        {authError ? <p className="subtle-copy is-error">{authError}</p> : null}
+        {account.errorMessage ? <p className="subtle-copy is-error">{account.errorMessage}</p> : null}
+      </section>
 
       <section className="panel form-panel">
         <p className="eyebrow">Essentials</p>

@@ -243,6 +243,42 @@ button {
   gap: 0.9rem;
 }
 
+.account-summary {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 1rem;
+  background: rgba(6, 14, 22, 0.72);
+  border: 1px solid rgba(132, 255, 173, 0.14);
+}
+
+.account-summary strong {
+  font-size: 1rem;
+}
+
+.account-summary span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.inline-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+}
+
+.inline-actions > button {
+  flex: 1 1 10rem;
+}
+
+.is-success {
+  color: var(--accent);
+}
+
+.is-error {
+  color: var(--danger);
+}
+
 .field,
 .toggle-field {
   display: flex;

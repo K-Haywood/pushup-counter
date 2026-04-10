@@ -7,7 +7,7 @@ import type {
 } from '../types/app';
 
 export const APP_STORAGE_KEY = 'pushup-counter:v1';
-export const APP_STATE_VERSION = 6;
+export const APP_STATE_VERSION = 7;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultDailyGoal: 100,
@@ -66,6 +66,7 @@ export function createEmptyStoredState(): StoredAppState {
     streakSnapshot: {
       current: 0,
       longest: 0
-    }
+    },
+    updatedAt: new Date().toISOString()
   };
 }
