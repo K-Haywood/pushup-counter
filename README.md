@@ -89,7 +89,6 @@ pushup-counter/
 ### Install and run
 
 ```powershell
-cd "C:\Users\61481\Documents\New project\pushup-counter"
 npm install
 npm run dev
 ```
@@ -97,7 +96,6 @@ npm run dev
 ### Build and lint
 
 ```powershell
-cd "C:\Users\61481\Documents\New project\pushup-counter"
 npm run lint
 npm run build
 ```
@@ -115,7 +113,6 @@ The production build is written to `dist/`.
 ### Exact commands to deploy
 
 ```powershell
-cd "C:\Users\61481\Documents\New project\pushup-counter"
 git init
 git add .
 git commit -m "Initial Pushup Counter PWA"
