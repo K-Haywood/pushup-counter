@@ -48,6 +48,12 @@ button {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+@media all and (display-mode: standalone) {
+  .app-shell {
+    padding-top: max(0.75rem, env(safe-area-inset-top));
+  }
+}
+
 .update-banner {
   position: fixed;
   top: max(0.65rem, env(safe-area-inset-top));
