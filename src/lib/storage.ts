@@ -4,9 +4,13 @@ import type {
   AppSettings,
   DashboardSummary,
   DayRecord,
+  FormAnalyticsSummary,
   HistoryPoint,
   ProgressPeriodSummary,
   ProgressSnapshot,
+  RecentSetInsight,
+  RepAnalysis,
+  RepTelemetry,
   SetRecord,
   StoredAppState,
   StreakSnapshot
@@ -27,6 +31,46 @@ function ensureNumber(value: unknown, fallback: number): number {
 
 function ensureBoolean(value: unknown, fallback: boolean): boolean {
   return typeof value === 'boolean' ? value : fallback;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
+function averageOrNull(values: number[]): number | null {
+  if (values.length === 0) {
+    return null;
+  }
+
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function createEmptyFormAnalytics(): FormAnalyticsSummary {
+  return {
+    analyzedReps: 0,
+    avgQualityScore: null,
+    avgDepth: null,
+    avgCycleMs: null,
+    avgDownMs: null,
+    avgUpMs: null,
+    avgBottomHoldMs: null,
+    consistencyScore: null
+  };
+}
+
+function toRepAnalysis(rawRep: Partial<RepAnalysis>): RepAnalysis {
+  return {
+    id: typeof rawRep.id === 'string' ? rawRep.id : generateId('rep'),
+    countedAt: typeof rawRep.countedAt === 'string' ? rawRep.countedAt : new Date().toISOString(),
+    downMs: rawRep.downMs == null ? null : ensureNumber(rawRep.downMs, 0),
+    upMs: rawRep.upMs == null ? null : ensureNumber(rawRep.upMs, 0),
+    cycleMs: rawRep.cycleMs == null ? null : ensureNumber(rawRep.cycleMs, 0),
+    bottomHoldMs: rawRep.bottomHoldMs == null ? null : ensureNumber(rawRep.bottomHoldMs, 0),
+    depth: clamp(ensureNumber(rawRep.depth, 0), 0, 1),
+    confidence: clamp(ensureNumber(rawRep.confidence, 0), 0, 1),
+    alignmentScore: clamp(ensureNumber(rawRep.alignmentScore, 0), 0, 1),
+    qualityScore: clamp(ensureNumber(rawRep.qualityScore, 0), 0, 100)
+  };
 }
 
 function openStorageDatabase(): Promise<IDBDatabase> {
@@ -234,7 +278,8 @@ export function loadStoredState(storageKey: string): StoredAppState {
                     : new Date().toISOString(),
                 delta: ensureNumber(correction.delta, 0),
                 reason: correction.reason === 'reset' ? 'reset' : 'manual'
-              }))
+              })),
+              repAnalytics: (set.repAnalytics ?? []).map((rep) => toRepAnalysis(rep))
             }))
           } satisfies DayRecord
         ];
@@ -377,6 +422,82 @@ function countMeaningfulSets(day: DayRecord): number {
   return day.sets.filter((set) => set.reps > 0 || set.autoCountedReps > 0 || Boolean(set.endedAt)).length;
 }
 
+function summarizeRepAnalytics(repAnalytics: RepAnalysis[]): FormAnalyticsSummary {
+  if (repAnalytics.length === 0) {
+    return createEmptyFormAnalytics();
+  }
+
+  const cycleDurations = repAnalytics
+    .map((rep) => rep.cycleMs)
+    .filter((value): value is number => value != null && Number.isFinite(value));
+  const averageCycle = averageOrNull(cycleDurations);
+  const cycleVariance =
+    averageCycle == null || cycleDurations.length < 2
+      ? null
+      : cycleDurations.reduce((sum, value) => sum + (value - averageCycle) ** 2, 0) / cycleDurations.length;
+  const cycleDeviation = cycleVariance == null ? null : Math.sqrt(cycleVariance);
+  const consistencyScore =
+    averageCycle == null || cycleDeviation == null
+      ? null
+      : Math.round(clamp(1 - cycleDeviation / Math.max(averageCycle, 1), 0, 1) * 100);
+
+  return {
+    analyzedReps: repAnalytics.length,
+    avgQualityScore: averageOrNull(repAnalytics.map((rep) => rep.qualityScore)),
+    avgDepth: averageOrNull(repAnalytics.map((rep) => rep.depth)),
+    avgCycleMs: averageCycle,
+    avgDownMs: averageOrNull(
+      repAnalytics.map((rep) => rep.downMs).filter((value): value is number => value != null && Number.isFinite(value))
+    ),
+    avgUpMs: averageOrNull(
+      repAnalytics.map((rep) => rep.upMs).filter((value): value is number => value != null && Number.isFinite(value))
+    ),
+    avgBottomHoldMs: averageOrNull(
+      repAnalytics
+        .map((rep) => rep.bottomHoldMs)
+        .filter((value): value is number => value != null && Number.isFinite(value))
+    ),
+    consistencyScore
+  };
+}
+
+function listTrackedSets(days: DayRecord[]): Array<{ date: string; set: SetRecord }> {
+  return days.flatMap((day) =>
+    day.sets
+      .filter((set) => set.reps > 0 || set.autoCountedReps > 0 || Boolean(set.endedAt))
+      .map((set) => ({
+        date: day.date,
+        set
+      }))
+  );
+}
+
+function summarizeFormAnalyticsForSets(sets: SetRecord[]): FormAnalyticsSummary {
+  return summarizeRepAnalytics(sets.flatMap((set) => set.repAnalytics));
+}
+
+function buildRecentSetInsight(date: string, set: SetRecord): RecentSetInsight {
+  const summary = summarizeRepAnalytics(set.repAnalytics);
+
+  return {
+    id: set.id,
+    date,
+    startedAt: set.startedAt,
+    endedAt: set.endedAt,
+    reps: set.reps,
+    analyzedReps: summary.analyzedReps,
+    avgQualityScore: summary.avgQualityScore,
+    avgDepth: summary.avgDepth,
+    avgCycleMs: summary.avgCycleMs,
+    avgDownMs: summary.avgDownMs,
+    avgUpMs: summary.avgUpMs,
+    avgBottomHoldMs: summary.avgBottomHoldMs,
+    consistencyScore: summary.consistencyScore,
+    bestRepQuality:
+      set.repAnalytics.length > 0 ? Math.max(...set.repAnalytics.map((rep) => rep.qualityScore)) : null
+  };
+}
+
 function summarizePeriod(days: DayRecord[]): ProgressPeriodSummary {
   const totalReps = days.reduce((sum, day) => sum + day.totalReps, 0);
   const totalSets = days.reduce((sum, day) => sum + countMeaningfulSets(day), 0);
@@ -479,6 +600,9 @@ export function buildProgressSnapshot(
   const weekDays = listDateKeysBack(7, today).map((dateKey) => getExistingOrEmptyDay(state, dateKey));
   const monthDays = listDateKeysBack(30, today).map((dateKey) => getExistingOrEmptyDay(state, dateKey));
   const lifetimeDays = Object.values(state.days).sort((a, b) => a.date.localeCompare(b.date));
+  const weekSets = listTrackedSets(weekDays).map((entry) => entry.set);
+  const monthSets = listTrackedSets(monthDays).map((entry) => entry.set);
+  const lifetimeTrackedSets = listTrackedSets(lifetimeDays);
   const bestDay = lifetimeDays.reduce<DayRecord | null>(
     (currentBest, day) => {
       if (!currentBest || day.totalReps > currentBest.totalReps) {
@@ -498,6 +622,18 @@ export function buildProgressSnapshot(
       trackedDays: lifetimeDays.length,
       bestDayDate: bestDay?.date ?? null,
       bestDayReps: bestDay?.totalReps ?? 0
+    },
+    form: {
+      week: summarizeFormAnalyticsForSets(weekSets),
+      month: summarizeFormAnalyticsForSets(monthSets),
+      lifetime: summarizeFormAnalyticsForSets(lifetimeTrackedSets.map((entry) => entry.set)),
+      recentSets: lifetimeTrackedSets
+        .map(({ date, set }) => buildRecentSetInsight(date, set))
+        .sort(
+          (left, right) =>
+            Date.parse(right.endedAt ?? right.startedAt) - Date.parse(left.endedAt ?? left.startedAt)
+        )
+        .slice(0, 6)
     }
   };
 }
@@ -524,7 +660,8 @@ export function startSet(state: StoredAppState, dateKey = getLocalDateKey()): vo
     reps: 0,
     autoCountedReps: 0,
     manualAdjustments: 0,
-    corrections: []
+    corrections: [],
+    repAnalytics: []
   };
 
   day.sets.push(newSet);
@@ -545,7 +682,12 @@ export function endSet(state: StoredAppState, dateKey = getLocalDateKey()): void
   state.session.activeDate = null;
 }
 
-export function addRepToActiveSet(state: StoredAppState, delta: number, source: 'auto' | 'manual'): void {
+export function addRepToActiveSet(
+  state: StoredAppState,
+  delta: number,
+  source: 'auto' | 'manual',
+  repTelemetry?: RepTelemetry
+): void {
   const day = ensureDayRecord(state, getLocalDateKey());
   const set = getActiveSet(day, state.session.activeSetId);
 
@@ -564,6 +706,17 @@ export function addRepToActiveSet(state: StoredAppState, delta: number, source: 
   set.autoCountedReps += source === 'auto' ? appliedDelta : 0;
   day.totalReps = Math.max(0, day.totalReps + appliedDelta);
   day.updatedAt = new Date().toISOString();
+
+  if (source === 'auto' && appliedDelta > 0 && repTelemetry) {
+    set.repAnalytics.push(
+      toRepAnalysis({
+        ...repTelemetry,
+        countedAt: new Date().toISOString()
+      })
+    );
+  } else if (source === 'manual' && appliedDelta < 0 && set.repAnalytics.length > 0) {
+    set.repAnalytics.splice(Math.max(0, set.repAnalytics.length + appliedDelta), Math.abs(appliedDelta));
+  }
 
   if (source === 'manual') {
     set.corrections.push({
@@ -587,6 +740,7 @@ export function resetActiveSet(state: StoredAppState): void {
   set.reps = 0;
   set.autoCountedReps = 0;
   set.manualAdjustments = 0;
+  set.repAnalytics = [];
   set.corrections.push({
     id: generateId('correction'),
     timestamp: new Date().toISOString(),

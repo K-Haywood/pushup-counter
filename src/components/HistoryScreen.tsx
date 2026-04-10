@@ -1,5 +1,12 @@
 import { formatFullDate, formatHistoryLabel } from '../lib/dates';
-import type { HistoryPoint, ProgressPeriodSummary, ProgressSnapshot, StreakSnapshot } from '../types/app';
+import type {
+  FormAnalyticsSummary,
+  HistoryPoint,
+  ProgressPeriodSummary,
+  ProgressSnapshot,
+  RecentSetInsight,
+  StreakSnapshot
+} from '../types/app';
 import { StatCard } from './StatCard';
 
 interface HistoryScreenProps {
@@ -87,6 +94,79 @@ function getStorageLabel(storageStatus: 'loading' | 'saved' | 'error') {
   return 'Stored on this device in IndexedDB with a local cache fallback.';
 }
 
+function formatDurationMs(value: number | null) {
+  if (value == null) {
+    return 'Not enough data';
+  }
+
+  return `${(value / 1000).toFixed(2)}s`;
+}
+
+function formatPercent(value: number | null) {
+  if (value == null) {
+    return 'Not enough data';
+  }
+
+  return `${Math.round(value * 100)}%`;
+}
+
+function formatScore(value: number | null) {
+  if (value == null) {
+    return 'Not enough data';
+  }
+
+  return `${Math.round(value)}/100`;
+}
+
+function FormSection({
+  title,
+  summary
+}: {
+  title: string;
+  summary: FormAnalyticsSummary;
+}) {
+  return (
+    <article className="analysis-card">
+      <span className="analysis-card__label">{title}</span>
+      <strong className="analysis-card__value">{formatScore(summary.avgQualityScore)}</strong>
+      <p className="analysis-card__helper">{summary.analyzedReps} tracked reps</p>
+      <div className="analysis-card__metrics">
+        <span>Depth {formatPercent(summary.avgDepth)}</span>
+        <span>Tempo {formatDurationMs(summary.avgCycleMs)}</span>
+        <span>Down {formatDurationMs(summary.avgDownMs)}</span>
+        <span>Up {formatDurationMs(summary.avgUpMs)}</span>
+        <span>Pause {formatDurationMs(summary.avgBottomHoldMs)}</span>
+        <span>Consistency {formatScore(summary.consistencyScore)}</span>
+      </div>
+    </article>
+  );
+}
+
+function RecentSetCard({ insight }: { insight: RecentSetInsight }) {
+  return (
+    <article className="session-analysis-card">
+      <div className="session-analysis-card__header">
+        <div>
+          <span className="analysis-card__label">{formatFullDate(insight.date)}</span>
+          <strong className="session-analysis-card__title">
+            {insight.reps} reps{insight.endedAt ? '' : ' so far'}
+          </strong>
+        </div>
+        <span className="session-analysis-card__score">{formatScore(insight.avgQualityScore)}</span>
+      </div>
+
+      <div className="session-analysis-card__grid">
+        <span>Depth {formatPercent(insight.avgDepth)}</span>
+        <span>Tempo {formatDurationMs(insight.avgCycleMs)}</span>
+        <span>Down {formatDurationMs(insight.avgDownMs)}</span>
+        <span>Up {formatDurationMs(insight.avgUpMs)}</span>
+        <span>Pause {formatDurationMs(insight.avgBottomHoldMs)}</span>
+        <span>Best rep {formatScore(insight.bestRepQuality)}</span>
+      </div>
+    </article>
+  );
+}
+
 export function HistoryScreen({
   last7Days,
   last30Days,
@@ -136,6 +216,22 @@ export function HistoryScreen({
       <section className="panel">
         <div className="panel__header">
           <div>
+            <p className="eyebrow">Form analysis</p>
+            <h2>Quality, depth, and tempo</h2>
+            <p className="subtle-copy">Based on auto-counted reps captured during each set.</p>
+          </div>
+        </div>
+
+        <div className="analysis-grid">
+          <FormSection title="This week" summary={progress.form.week} />
+          <FormSection title="This month" summary={progress.form.month} />
+          <FormSection title="Lifetime" summary={progress.form.lifetime} />
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel__header">
+          <div>
             <p className="eyebrow">Lifetime</p>
             <h2>All-time totals</h2>
           </div>
@@ -176,6 +272,25 @@ export function HistoryScreen({
             <strong>{storageStatus === 'error' ? 'Needs attention' : 'Local only'}</strong>
           </div>
         </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel__header">
+          <div>
+            <p className="eyebrow">Recent sets</p>
+            <h2>Session analysis</h2>
+          </div>
+        </div>
+
+        {progress.form.recentSets.length > 0 ? (
+          <div className="session-analysis-list">
+            {progress.form.recentSets.map((insight) => (
+              <RecentSetCard key={insight.id} insight={insight} />
+            ))}
+          </div>
+        ) : (
+          <p className="subtle-copy">Finish a few auto-counted reps and your set analysis will show up here.</p>
+        )}
       </section>
     </section>
   );

@@ -7,7 +7,7 @@ import type {
 } from '../types/app';
 
 export const APP_STORAGE_KEY = 'pushup-counter:v1';
-export const APP_STATE_VERSION = 4;
+export const APP_STATE_VERSION = 5;
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultDailyGoal: 100,

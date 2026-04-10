@@ -815,6 +815,72 @@ button {
   padding-top: 0;
 }
 
+.analysis-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.analysis-card,
+.session-analysis-card {
+  padding: 0.95rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: rgba(4, 12, 19, 0.72);
+}
+
+.analysis-card__label {
+  display: block;
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.analysis-card__value,
+.session-analysis-card__title,
+.session-analysis-card__score {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 1.3rem;
+  font-weight: 800;
+}
+
+.analysis-card__helper {
+  margin: 0.2rem 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.analysis-card__metrics,
+.session-analysis-card__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem 0.7rem;
+  margin-top: 0.85rem;
+  color: #dbe8f5;
+  font-size: 0.83rem;
+}
+
+.session-analysis-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.session-analysis-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.session-analysis-card__score {
+  margin-top: 0;
+  color: var(--accent);
+  font-size: 1.1rem;
+  white-space: nowrap;
+}
+
 .session-toolbar {
   display: flex;
   justify-content: space-between;
@@ -1008,7 +1074,8 @@ button {
 
   .progress-trio,
   .progress-summary,
-  .diagnostic-grid {
+  .diagnostic-grid,
+  .analysis-grid {
     grid-template-columns: 1fr;
   }
 
@@ -1019,6 +1086,11 @@ button {
   .progress-storage__row {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .analysis-card__metrics,
+  .session-analysis-card__grid {
+    grid-template-columns: 1fr;
   }
 
   .screen-header h1,

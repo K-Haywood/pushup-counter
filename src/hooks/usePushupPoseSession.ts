@@ -10,7 +10,8 @@ import type {
   CameraDeviceOption,
   PoseFrameMetrics,
   PoseStatus,
-  PoseSessionViewState
+  PoseSessionViewState,
+  RepTelemetry
 } from '../types/app';
 
 const INFERENCE_INTERVAL_MS = 70;
@@ -25,7 +26,7 @@ const MOTION_PROGRESS_BLEND = 0.6;
 interface UsePushupPoseSessionOptions {
   settings: AppSettings;
   setActive: boolean;
-  onRepCounted: () => void;
+  onRepCounted: (repTelemetry: RepTelemetry) => void;
 }
 
 interface CalibrationDraft {
@@ -571,8 +572,8 @@ export function usePushupPoseSession({
     const displayedStatus = resolveDisplayedStatus(frame.status, frame.guidance, timestamp);
     const repProgress = resolveRepProgress(update.smoothedAngle, timestamp);
 
-    if (update.repCount > 0) {
-      onRepCountedRef.current();
+    if (update.repCount > 0 && update.repTelemetry) {
+      onRepCountedRef.current(update.repTelemetry);
       triggerRepFeedback(settingsRef.current.soundEnabled, settingsRef.current.vibrationEnabled);
     }
 

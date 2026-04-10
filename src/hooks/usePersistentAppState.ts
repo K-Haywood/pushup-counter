@@ -17,7 +17,7 @@ import {
   startSet
 } from '../lib/storage';
 import { getLocalDateKey } from '../lib/dates';
-import type { AppSettings, StoredAppState } from '../types/app';
+import type { AppSettings, RepTelemetry, StoredAppState } from '../types/app';
 
 export function usePersistentAppState() {
   const [state, setState] = useState<StoredAppState>(() => loadStoredState(APP_STORAGE_KEY));
@@ -127,9 +127,9 @@ export function usePersistentAppState() {
         endSet(draft, getLocalDateKey());
       });
     },
-    addAutoRep() {
+    addAutoRep(repTelemetry: RepTelemetry) {
       updateState((draft) => {
-        addRepToActiveSet(draft, 1, 'auto');
+        addRepToActiveSet(draft, 1, 'auto', repTelemetry);
       });
     },
     adjustCurrentSet(delta: number) {

@@ -4,7 +4,8 @@ import type {
   CalibrationSnapshot,
   CounterRuntimeState,
   CounterUpdate,
-  PoseFrameMetrics
+  PoseFrameMetrics,
+  RepTelemetry
 } from '../types/app';
 
 type Landmark = {
@@ -42,6 +43,7 @@ const OPTIONAL_FRONTAL_POINTS = [23, 24];
 const PHASE_HOLD_MS = 90;
 const PHASE_HYSTERESIS = 6;
 const DIRECTION_EPSILON = 0.55;
+const ANALYTICS_ALIGNMENT_MULTIPLIER = 1.45;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -67,6 +69,86 @@ function weightedAverage(entries: Array<{ value: number; weight: number }>): num
   }
 
   return valid.reduce((sum, entry) => sum + entry.value * entry.weight, 0) / weightSum;
+}
+
+function getRepProgressFromAngle(angle: number, settings: AppSettings): number {
+  const range = Math.max(settings.topThreshold - settings.bottomThreshold, 1);
+  return clamp((settings.topThreshold - angle) / range, 0, 1);
+}
+
+function getAlignmentScore(alignmentError: number | null, settings: AppSettings): number {
+  if (alignmentError == null) {
+    return 0.5;
+  }
+
+  return clamp(1 - alignmentError / Math.max(settings.bodyAlignmentTolerance * ANALYTICS_ALIGNMENT_MULTIPLIER, 0.001), 0, 1);
+}
+
+function beginTrackedRep(state: CounterRuntimeState, timestamp: number): void {
+  state.currentRepStartedAt = timestamp;
+  state.currentBottomAt = null;
+  state.currentAscendingAt = null;
+  state.currentPeakProgress = 0;
+  state.currentConfidenceTotal = 0;
+  state.currentAlignmentScoreTotal = 0;
+  state.currentSampleCount = 0;
+}
+
+function captureRepSample(
+  state: CounterRuntimeState,
+  frame: PoseFrameMetrics,
+  progress: number,
+  settings: AppSettings
+): void {
+  if (state.currentRepStartedAt == null) {
+    return;
+  }
+
+  state.currentPeakProgress = Math.max(state.currentPeakProgress, progress);
+  state.currentConfidenceTotal += frame.confidence;
+  state.currentAlignmentScoreTotal += getAlignmentScore(frame.alignmentError, settings);
+  state.currentSampleCount += 1;
+}
+
+function completeTrackedRep(state: CounterRuntimeState, timestamp: number): RepTelemetry | null {
+  if (state.currentRepStartedAt == null) {
+    return null;
+  }
+
+  const downMs = state.currentBottomAt == null ? null : Math.max(0, Math.round(state.currentBottomAt - state.currentRepStartedAt));
+  const upMs =
+    state.currentBottomAt == null ? null : Math.max(0, Math.round(timestamp - state.currentBottomAt));
+  const cycleMs = Math.max(0, Math.round(timestamp - state.currentRepStartedAt));
+  const bottomHoldMs =
+    state.currentBottomAt == null || state.currentAscendingAt == null
+      ? null
+      : Math.max(0, Math.round(state.currentAscendingAt - state.currentBottomAt));
+  const sampleCount = Math.max(state.currentSampleCount, 1);
+  const confidence = clamp(state.currentConfidenceTotal / sampleCount, 0, 1);
+  const alignmentScore = clamp(state.currentAlignmentScoreTotal / sampleCount, 0, 1);
+  const depth = clamp(state.currentPeakProgress, 0, 1);
+  const qualityScore = Math.round(clamp(depth * 0.5 + confidence * 0.25 + alignmentScore * 0.25, 0, 1) * 100);
+
+  return {
+    downMs,
+    upMs,
+    cycleMs,
+    bottomHoldMs,
+    depth,
+    confidence,
+    alignmentScore,
+    qualityScore
+  };
+}
+
+function resetTrackedRep(state: CounterRuntimeState): void {
+  state.currentRepStartedAt = null;
+  state.currentBottomAt = null;
+  state.currentAscendingAt = null;
+  state.currentPeakProgress = 0;
+  state.currentConfidenceTotal = 0;
+  state.currentAlignmentScoreTotal = 0;
+  state.currentSampleCount = 0;
 }
 
 function distance(a: Landmark, b: Landmark): number {
@@ -166,7 +248,14 @@ export function createCounterRuntimeState(): CounterRuntimeState {
     previousSmoothedAngle: null,
     lastRepTimestamp: 0,
     phaseEnteredAt: 0,
-    seenBottom: false
+    seenBottom: false,
+    currentRepStartedAt: null,
+    currentBottomAt: null,
+    currentAscendingAt: null,
+    currentPeakProgress: 0,
+    currentConfidenceTotal: 0,
+    currentAlignmentScoreTotal: 0,
+    currentSampleCount: 0
   };
 }
 
@@ -276,7 +365,7 @@ export function analyzePoseFrame(
     1
   );
   const alignmentScore = clamp(
-    1 - alignmentError / Math.max(settings.bodyAlignmentTolerance * 1.45, 0.001),
+    1 - alignmentError / Math.max(settings.bodyAlignmentTolerance * ANALYTICS_ALIGNMENT_MULTIPLIER, 0.001),
     0,
     1
   );
@@ -361,7 +450,8 @@ export function updateCounterState(
       state: next,
       phase: next.phase,
       repCount: 0,
-      smoothedAngle: null
+      smoothedAngle: null,
+      repTelemetry: null
     };
   }
 
@@ -383,6 +473,7 @@ export function updateCounterState(
   const movingUp = delta > DIRECTION_EPSILON;
   const atTop = smoothedAngle >= settings.topThreshold;
   const atBottom = smoothedAngle <= settings.bottomThreshold;
+  const repProgress = getRepProgressFromAngle(smoothedAngle, settings);
 
   if (!frame.countingReady) {
     next.previousSmoothedAngle = smoothedAngle;
@@ -390,8 +481,13 @@ export function updateCounterState(
       state: next,
       phase: next.phase,
       repCount: 0,
-      smoothedAngle
+      smoothedAngle,
+      repTelemetry: null
     };
+  }
+
+  if (next.currentRepStartedAt != null) {
+    captureRepSample(next, frame, repProgress, settings);
   }
 
   // The finite-state machine only awards a rep after a full cycle:
@@ -399,6 +495,8 @@ export function updateCounterState(
   switch (next.phase) {
     case 'top': {
       if (movingDown && smoothedAngle < settings.topThreshold - PHASE_HYSTERESIS) {
+        beginTrackedRep(next, timestamp);
+        captureRepSample(next, frame, repProgress, settings);
         next.phase = 'descending';
         next.phaseEnteredAt = timestamp;
       }
@@ -409,9 +507,12 @@ export function updateCounterState(
         next.phase = 'bottom';
         next.phaseEnteredAt = timestamp;
         next.seenBottom = true;
+        next.currentBottomAt = timestamp;
       } else if (atTop && !movingDown) {
         next.phase = 'top';
         next.phaseEnteredAt = timestamp;
+        next.seenBottom = false;
+        resetTrackedRep(next);
       }
       break;
     }
@@ -419,6 +520,7 @@ export function updateCounterState(
       if (movingUp && smoothedAngle > settings.bottomThreshold + PHASE_HYSTERESIS) {
         next.phase = 'ascending';
         next.phaseEnteredAt = timestamp;
+        next.currentAscendingAt = timestamp;
       }
       break;
     }
@@ -433,18 +535,23 @@ export function updateCounterState(
         next.phaseEnteredAt = timestamp;
         next.lastRepTimestamp = timestamp;
         next.seenBottom = false;
+        const repTelemetry = completeTrackedRep(next, timestamp);
+        resetTrackedRep(next);
         next.previousSmoothedAngle = smoothedAngle;
         return {
           state: next,
           phase: next.phase,
           repCount: allowRepCount ? 1 : 0,
-          smoothedAngle
+          smoothedAngle,
+          repTelemetry: allowRepCount ? repTelemetry : null
         };
       }
 
       if (atBottom && movingDown) {
         next.phase = 'bottom';
         next.phaseEnteredAt = timestamp;
+        next.currentBottomAt = timestamp;
+        next.currentAscendingAt = null;
       }
       break;
     }
@@ -455,6 +562,7 @@ export function updateCounterState(
     state: next,
     phase: next.phase,
     repCount: 0,
-    smoothedAngle
+    smoothedAngle,
+    repTelemetry: null
   };
 }

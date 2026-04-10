@@ -42,6 +42,22 @@ export interface CorrectionRecord {
   reason: 'manual' | 'reset';
 }
 
+export interface RepTelemetry {
+  downMs: number | null;
+  upMs: number | null;
+  cycleMs: number | null;
+  bottomHoldMs: number | null;
+  depth: number;
+  confidence: number;
+  alignmentScore: number;
+  qualityScore: number;
+}
+
+export interface RepAnalysis extends RepTelemetry {
+  id: string;
+  countedAt: string;
+}
+
 export interface SetRecord {
   id: string;
   startedAt: string;
@@ -50,6 +66,7 @@ export interface SetRecord {
   autoCountedReps: number;
   manualAdjustments: number;
   corrections: CorrectionRecord[];
+  repAnalytics: RepAnalysis[];
 }
 
 export interface DayRecord {
@@ -107,6 +124,26 @@ export interface ProgressPeriodSummary {
   averagePerDay: number;
 }
 
+export interface FormAnalyticsSummary {
+  analyzedReps: number;
+  avgQualityScore: number | null;
+  avgDepth: number | null;
+  avgCycleMs: number | null;
+  avgDownMs: number | null;
+  avgUpMs: number | null;
+  avgBottomHoldMs: number | null;
+  consistencyScore: number | null;
+}
+
+export interface RecentSetInsight extends FormAnalyticsSummary {
+  id: string;
+  date: string;
+  startedAt: string;
+  endedAt: string | null;
+  reps: number;
+  bestRepQuality: number | null;
+}
+
 export interface ProgressSnapshot {
   week: ProgressPeriodSummary;
   month: ProgressPeriodSummary;
@@ -114,6 +151,12 @@ export interface ProgressSnapshot {
     trackedDays: number;
     bestDayDate: string | null;
     bestDayReps: number;
+  };
+  form: {
+    week: FormAnalyticsSummary;
+    month: FormAnalyticsSummary;
+    lifetime: FormAnalyticsSummary;
+    recentSets: RecentSetInsight[];
   };
 }
 
@@ -153,6 +196,13 @@ export interface CounterRuntimeState {
   lastRepTimestamp: number;
   phaseEnteredAt: number;
   seenBottom: boolean;
+  currentRepStartedAt: number | null;
+  currentBottomAt: number | null;
+  currentAscendingAt: number | null;
+  currentPeakProgress: number;
+  currentConfidenceTotal: number;
+  currentAlignmentScoreTotal: number;
+  currentSampleCount: number;
 }
 
 export interface CounterUpdate {
@@ -160,6 +210,7 @@ export interface CounterUpdate {
   phase: CounterPhase;
   repCount: number;
   smoothedAngle: number | null;
+  repTelemetry: RepTelemetry | null;
 }
 
 export interface PoseSessionViewState {
