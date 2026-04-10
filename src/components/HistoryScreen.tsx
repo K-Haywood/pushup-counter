@@ -5,12 +5,14 @@ import {
   formatAnalysisScore,
   getFormTakeaway
 } from '../lib/formInsights';
-import type { ProgressSnapshot, RecentSetInsight, StreakSnapshot } from '../types/app';
+import type { HistoryPoint, ProgressSnapshot, RecentSetInsight, StreakSnapshot } from '../types/app';
 import { StatCard } from './StatCard';
 
 interface HistoryScreenProps {
   progress: ProgressSnapshot;
   streakSnapshot: StreakSnapshot;
+  last7Days: HistoryPoint[];
+  last30Days: HistoryPoint[];
 }
 
 function RecentSetCard({ insight }: { insight: RecentSetInsight }) {
@@ -32,7 +34,50 @@ function RecentSetCard({ insight }: { insight: RecentSetInsight }) {
   );
 }
 
-export function HistoryScreen({ progress, streakSnapshot }: HistoryScreenProps) {
+function TrendGraph({
+  title,
+  points,
+  summary,
+  accentClassName
+}: {
+  title: string;
+  points: HistoryPoint[];
+  summary: string;
+  accentClassName: string;
+}) {
+  const maxValue = Math.max(...points.map((point) => point.totalReps), 1);
+
+  return (
+    <article className="trend-graph-card">
+      <div className="panel__header trend-graph-card__header">
+        <div>
+          <p className="eyebrow">{title}</p>
+          <p className="subtle-copy">{summary}</p>
+        </div>
+      </div>
+
+      <div className="trend-graph">
+        {points.map((point) => {
+          const barHeight = Math.max((point.totalReps / maxValue) * 100, point.totalReps > 0 ? 10 : 2);
+
+          return (
+            <div key={point.date} className="trend-graph__day">
+              <div className="trend-graph__bar-wrap" aria-hidden="true">
+                <span className={`trend-graph__bar ${accentClassName}`} style={{ height: `${barHeight}%` }} />
+              </div>
+              <span className="trend-graph__label">{point.totalReps}</span>
+              <span className={point.hitGoal ? 'trend-graph__date is-hit' : 'trend-graph__date'}>
+                {formatFullDate(point.date)}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </article>
+  );
+}
+
+export function HistoryScreen({ progress, streakSnapshot, last7Days, last30Days }: HistoryScreenProps) {
   const recentSets = progress.form.recentSets.slice(0, 3);
 
   return (
@@ -105,6 +150,30 @@ export function HistoryScreen({ progress, streakSnapshot }: HistoryScreenProps) 
         />
         <StatCard label="Goal days" value={progress.lifetime.goalDays} accent="amber" helper="lifetime total" />
       </div>
+
+      <section className="panel">
+        <div className="panel__header">
+          <div>
+            <p className="eyebrow">Trend graphs</p>
+            <h2>How volume is moving</h2>
+          </div>
+        </div>
+
+        <div className="trend-graphs">
+          <TrendGraph
+            title="Last 7 days"
+            points={last7Days}
+            summary="Quick glance at your weekly rhythm."
+            accentClassName="trend-graph__bar--lime"
+          />
+          <TrendGraph
+            title="Last 30 days"
+            points={last30Days}
+            summary="Longer trend for consistency and momentum."
+            accentClassName="trend-graph__bar--amber"
+          />
+        </div>
+      </section>
 
       <section className="panel">
         <div className="panel__header">

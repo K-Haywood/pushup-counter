@@ -898,12 +898,6 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.analysis-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.75rem;
-}
-
 .analysis-card,
 .session-analysis-card {
   padding: 0.95rem;
@@ -943,6 +937,71 @@ button {
   margin-top: 0.85rem;
   color: #dbe8f5;
   font-size: 0.83rem;
+}
+
+.trend-graphs {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.trend-graph-card {
+  padding: 0.95rem;
+  border-radius: 1rem;
+  border: 1px solid var(--border);
+  background: rgba(4, 12, 19, 0.72);
+}
+
+.trend-graph-card__header {
+  margin-bottom: 0.8rem;
+}
+
+.trend-graph {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 0.45rem;
+  align-items: end;
+  min-height: 8.5rem;
+}
+
+.trend-graph__day {
+  display: grid;
+  gap: 0.35rem;
+  justify-items: center;
+  align-items: end;
+}
+
+.trend-graph__bar-wrap {
+  width: 100%;
+  height: 6.5rem;
+  display: flex;
+  align-items: end;
+}
+
+.trend-graph__bar {
+  width: 100%;
+  min-height: 0.25rem;
+  border-radius: 999px 999px 0.4rem 0.4rem;
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+}
+
+.trend-graph__bar--amber {
+  background: linear-gradient(180deg, #ffd986, #ffb938);
+}
+
+.trend-graph__bar--lime {
+  background: linear-gradient(180deg, #a8ffca, #43d97e);
+}
+
+.trend-graph__label {
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.trend-graph__date {
+  color: var(--muted);
+  font-size: 0.68rem;
+  text-align: center;
+  line-height: 1.1;
 }
 
 .session-analysis-list {
@@ -1185,6 +1244,10 @@ button {
     grid-template-columns: 1fr;
   }
 
+  .trend-graph {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
   .screen-header h1,
   .panel h2,
   .hero-card h1 {
@@ -1232,5 +1295,9 @@ button {
   .manual-button {
     min-height: 3.05rem;
     padding: 0.8rem 0.85rem;
+  }
+
+  .trend-graph {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }

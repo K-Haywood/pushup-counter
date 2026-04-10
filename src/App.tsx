@@ -25,6 +25,8 @@ export default function App() {
     today,
     currentSet,
     summary,
+    last7Days,
+    last30Days,
     progress,
     startSet,
     endSet,
@@ -137,7 +139,12 @@ export default function App() {
         ) : null}
 
         {activeTab === 'history' ? (
-          <HistoryScreen progress={progress} streakSnapshot={state.streakSnapshot} />
+          <HistoryScreen
+            progress={progress}
+            streakSnapshot={state.streakSnapshot}
+            last7Days={last7Days}
+            last30Days={last30Days}
+          />
         ) : null}
 
         {activeTab === 'settings' ? (
