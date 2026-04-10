@@ -155,28 +155,40 @@ export function loadStoredState(storageKey: string): StoredAppState {
         3
       ),
       topThreshold: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.topThreshold,
+        migrateRecentNumberSetting(
+          migrateLegacyNumberSetting(
+            parsed.settings?.topThreshold,
+            DEFAULT_SETTINGS.topThreshold,
+            155,
+            parsedVersion
+          ),
           DEFAULT_SETTINGS.topThreshold,
-          155,
-          parsedVersion
+          142,
+          parsedVersion,
+          4
         ),
         DEFAULT_SETTINGS.topThreshold,
-        142,
+        138,
         parsedVersion,
-        4
+        6
       ),
       bottomThreshold: migrateRecentNumberSetting(
-        migrateLegacyNumberSetting(
-          parsed.settings?.bottomThreshold,
+        migrateRecentNumberSetting(
+          migrateLegacyNumberSetting(
+            parsed.settings?.bottomThreshold,
+            DEFAULT_SETTINGS.bottomThreshold,
+            95,
+            parsedVersion
+          ),
           DEFAULT_SETTINGS.bottomThreshold,
-          95,
-          parsedVersion
+          118,
+          parsedVersion,
+          4
         ),
         DEFAULT_SETTINGS.bottomThreshold,
-        118,
+        122,
         parsedVersion,
-        4
+        6
       ),
       minLandmarkVisibility: migrateRecentNumberSetting(
         migrateLegacyNumberSetting(

@@ -170,6 +170,7 @@ export interface CalibrationSnapshot {
   bodyScale: number;
   shoulderWidthRatio: number;
   hipWidthRatio: number;
+  topElbowAngle: number;
   capturedAt: string;
 }
 

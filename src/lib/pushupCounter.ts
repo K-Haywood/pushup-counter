@@ -24,6 +24,11 @@ type ArmMetrics = {
   wrist: Landmark;
 };
 
+type EffectiveThresholds = {
+  topThreshold: number;
+  bottomThreshold: number;
+};
+
 const LEFT = {
   shoulder: 11,
   elbow: 13,
@@ -44,6 +49,9 @@ const PHASE_HOLD_MS = 90;
 const PHASE_HYSTERESIS = 6;
 const DIRECTION_EPSILON = 0.55;
 const ANALYTICS_ALIGNMENT_MULTIPLIER = 1.45;
+const MIN_REP_DEPTH_PROGRESS = 0.6;
+const MIN_REP_CONFIDENCE = 0.48;
+const MIN_REP_ALIGNMENT = 0.42;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
@@ -71,9 +79,23 @@ function weightedAverage(entries: Array<{ value: number; weight: number }>): num
   return valid.reduce((sum, entry) => sum + entry.value * entry.weight, 0) / weightSum;
 }
 
-function getRepProgressFromAngle(angle: number, settings: AppSettings): number {
-  const range = Math.max(settings.topThreshold - settings.bottomThreshold, 1);
-  return clamp((settings.topThreshold - angle) / range, 0, 1);
+export function getEffectiveThresholds(
+  settings: AppSettings,
+  calibration: CalibrationSnapshot | null
+): EffectiveThresholds {
+  const calibratedTop =
+    calibration == null ? settings.topThreshold : Math.max(settings.topThreshold, calibration.topElbowAngle - 6);
+  const calibratedBottom = Math.max(settings.bottomThreshold, calibratedTop - 60);
+
+  return {
+    topThreshold: calibratedTop,
+    bottomThreshold: calibratedBottom
+  };
+}
+
+function getRepProgressFromAngle(angle: number, thresholds: EffectiveThresholds): number {
+  const range = Math.max(thresholds.topThreshold - thresholds.bottomThreshold, 1);
+  return clamp((thresholds.topThreshold - angle) / range, 0, 1);
 }
 
 function getAlignmentScore(alignmentError: number | null, settings: AppSettings): number {
@@ -316,15 +338,16 @@ export function analyzePoseFrame(
       : [])
   ]);
   const reachDerivedAngle = clamp(42 + armVerticalSpanRatio * 76, 72, 170);
-
-  const reachWeight = primaryArm.visibilityScore < 0.55 ? 0.58 : 0.42;
-
-  const weightedElbowAngle = weightedAverage([
+  const elbowAverage = weightedAverage([
     { value: primaryArm.elbowAngle, weight: Math.max(primaryArm.visibilityScore, 0.01) },
-    { value: reachDerivedAngle, weight: reachWeight },
     ...(secondaryArmUsable
-      ? [{ value: secondaryArm.elbowAngle, weight: Math.max(secondaryArm.visibilityScore * 0.65, 0.01) }]
+      ? [{ value: secondaryArm.elbowAngle, weight: Math.max(secondaryArm.visibilityScore * 0.8, 0.01) }]
       : [])
+  ]);
+  const reachWeight = clamp(0.28 - primaryArm.visibilityScore * 0.08, 0.08, 0.24);
+  const weightedElbowAngle = weightedAverage([
+    { value: elbowAverage, weight: 1 - reachWeight },
+    { value: reachDerivedAngle, weight: reachWeight }
   ]);
 
   const armSymmetryError = secondaryArmUsable
@@ -436,6 +459,7 @@ export function updateCounterState(
   runtime: CounterRuntimeState,
   frame: PoseFrameMetrics,
   settings: AppSettings,
+  calibration: CalibrationSnapshot | null,
   timestamp: number,
   allowRepCount: boolean
 ): CounterUpdate {
@@ -467,13 +491,14 @@ export function updateCounterState(
   }
 
   const smoothedAngle = average(next.angleWindow);
+  const thresholds = getEffectiveThresholds(settings, calibration);
   const delta =
     next.previousSmoothedAngle == null ? 0 : smoothedAngle - next.previousSmoothedAngle;
   const movingDown = delta < -DIRECTION_EPSILON;
   const movingUp = delta > DIRECTION_EPSILON;
-  const atTop = smoothedAngle >= settings.topThreshold;
-  const atBottom = smoothedAngle <= settings.bottomThreshold;
-  const repProgress = getRepProgressFromAngle(smoothedAngle, settings);
+  const atTop = smoothedAngle >= thresholds.topThreshold;
+  const atBottom = smoothedAngle <= thresholds.bottomThreshold;
+  const repProgress = getRepProgressFromAngle(smoothedAngle, thresholds);
 
   if (!frame.countingReady) {
     next.previousSmoothedAngle = smoothedAngle;
@@ -494,7 +519,7 @@ export function updateCounterState(
   // top -> descending -> bottom -> ascending -> top.
   switch (next.phase) {
     case 'top': {
-      if (movingDown && smoothedAngle < settings.topThreshold - PHASE_HYSTERESIS) {
+      if (movingDown && smoothedAngle < thresholds.topThreshold - PHASE_HYSTERESIS) {
         beginTrackedRep(next, timestamp);
         captureRepSample(next, frame, repProgress, settings);
         next.phase = 'descending';
@@ -517,7 +542,7 @@ export function updateCounterState(
       break;
     }
     case 'bottom': {
-      if (movingUp && smoothedAngle > settings.bottomThreshold + PHASE_HYSTERESIS) {
+      if (movingUp && smoothedAngle > thresholds.bottomThreshold + PHASE_HYSTERESIS) {
         next.phase = 'ascending';
         next.phaseEnteredAt = timestamp;
         next.currentAscendingAt = timestamp;
@@ -531,23 +556,29 @@ export function updateCounterState(
         timestamp - next.phaseEnteredAt >= PHASE_HOLD_MS &&
         timestamp - next.lastRepTimestamp >= settings.cooldownMs
       ) {
+        const repTelemetry = completeTrackedRep(next, timestamp);
+        const repIsValid =
+          repTelemetry != null &&
+          repTelemetry.depth >= MIN_REP_DEPTH_PROGRESS &&
+          repTelemetry.confidence >= MIN_REP_CONFIDENCE &&
+          repTelemetry.alignmentScore >= MIN_REP_ALIGNMENT;
+
         next.phase = 'top';
         next.phaseEnteredAt = timestamp;
-        next.lastRepTimestamp = timestamp;
+        next.lastRepTimestamp = repIsValid ? timestamp : next.lastRepTimestamp;
         next.seenBottom = false;
-        const repTelemetry = completeTrackedRep(next, timestamp);
         resetTrackedRep(next);
         next.previousSmoothedAngle = smoothedAngle;
         return {
           state: next,
           phase: next.phase,
-          repCount: allowRepCount ? 1 : 0,
+          repCount: allowRepCount && repIsValid ? 1 : 0,
           smoothedAngle,
-          repTelemetry: allowRepCount ? repTelemetry : null
+          repTelemetry: allowRepCount && repIsValid ? repTelemetry : null
         };
       }
 
-      if (atBottom && movingDown) {
+      if (atBottom && movingDown && next.currentPeakProgress >= MIN_REP_DEPTH_PROGRESS) {
         next.phase = 'bottom';
         next.phaseEnteredAt = timestamp;
         next.currentBottomAt = timestamp;

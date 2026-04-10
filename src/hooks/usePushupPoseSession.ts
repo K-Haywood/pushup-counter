@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { FilesetResolver, PoseLandmarker, type PoseLandmarkerResult } from '@mediapipe/tasks-vision';
 import { EMPTY_CAMERA_DEVICES, INITIAL_SESSION_VIEW_STATE } from '../lib/defaults';
-import { analyzePoseFrame, createCounterRuntimeState, updateCounterState } from '../lib/pushupCounter';
+import {
+  analyzePoseFrame,
+  createCounterRuntimeState,
+  getEffectiveThresholds,
+  updateCounterState
+} from '../lib/pushupCounter';
 import { drawPoseOverlay } from '../lib/drawPoseOverlay';
 import { triggerRepFeedback } from '../lib/feedback';
 import type {
@@ -67,13 +72,18 @@ function getStatusDelay(currentStatus: PoseStatus, nextStatus: PoseStatus): numb
   }
 }
 
-function getRepProgress(smoothedAngle: number | null, settings: AppSettings): number | null {
+function getRepProgress(
+  smoothedAngle: number | null,
+  settings: AppSettings,
+  calibration: CalibrationSnapshot | null
+): number | null {
   if (smoothedAngle == null) {
     return null;
   }
 
-  const range = Math.max(settings.topThreshold - settings.bottomThreshold, 1);
-  return clamp((settings.topThreshold - smoothedAngle) / range, 0, 1);
+  const thresholds = getEffectiveThresholds(settings, calibration);
+  const range = Math.max(thresholds.topThreshold - thresholds.bottomThreshold, 1);
+  return clamp((thresholds.topThreshold - smoothedAngle) / range, 0, 1);
 }
 
 async function listVideoInputs(): Promise<CameraDeviceOption[]> {
@@ -211,7 +221,7 @@ export function usePushupPoseSession({
   }
 
   function resolveRepProgress(smoothedAngle: number | null, timestamp: number): number {
-    const rawProgress = getRepProgress(smoothedAngle, settingsRef.current);
+    const rawProgress = getRepProgress(smoothedAngle, settingsRef.current, calibrationSnapshotRef.current);
 
     if (rawProgress != null) {
       lastMotionAtRef.current = timestamp;
@@ -261,16 +271,16 @@ export function usePushupPoseSession({
     const wasmBaseUrl = new URL('./vendor/mediapipe/wasm', window.location.href).toString();
     const modelUrl = new URL('./models/pose_landmarker_lite.task', window.location.href).toString();
     const vision = await FilesetResolver.forVisionTasks(wasmBaseUrl);
-    const poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-      baseOptions: {
-        modelAssetPath: modelUrl
-      },
-      runningMode: 'VIDEO',
-      numPoses: 2,
-      minPoseDetectionConfidence: 0.5,
-      minPosePresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5
-    });
+      const poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+        baseOptions: {
+          modelAssetPath: modelUrl
+        },
+        runningMode: 'VIDEO',
+        numPoses: 1,
+        minPoseDetectionConfidence: 0.5,
+        minPosePresenceConfidence: 0.5,
+        minTrackingConfidence: 0.5
+      });
 
     poseLandmarkerRef.current = poseLandmarker;
     setViewState((current) => ({
@@ -484,6 +494,8 @@ export function usePushupPoseSession({
           bodyScale,
           shoulderWidthRatio,
           hipWidthRatio,
+          topElbowAngle:
+            draft.samples.reduce((sum, sample) => sum + (sample.elbowAngle ?? 0), 0) / draft.samples.length,
           capturedAt: new Date().toISOString()
         };
 
@@ -565,6 +577,7 @@ export function usePushupPoseSession({
       counterStateRef.current,
       frame,
       settingsRef.current,
+      calibrationSnapshotRef.current,
       timestamp,
       setActiveRef.current
     );
