@@ -307,12 +307,14 @@ export function usePushupPoseSession({
           ? {
               deviceId: { exact: settings.preferredCameraId },
               width: { ideal: 1280 },
-              height: { ideal: 720 }
+              height: { ideal: 720 },
+              aspectRatio: { ideal: 16 / 9 }
             }
           : {
               facingMode: { ideal: settings.cameraFacingMode },
               width: { ideal: 1280 },
-              height: { ideal: 720 }
+              height: { ideal: 720 },
+              aspectRatio: { ideal: 16 / 9 }
             }
       };
 

@@ -105,106 +105,108 @@ export function CameraScreen({
         </div>
       </div>
 
-      {/* ── RIGHT: session controls ── */}
+      {/* ── BOTTOM: session controls ── */}
       <aside className="session-panel" aria-label="Session controls">
 
-        {/* Hero count */}
-        <div className="session-panel__hero">
-          <p className="eyebrow">{setActive ? 'This set' : 'Today'}</p>
-          <strong className="session-panel__count">
-            {setActive ? (currentSet?.reps ?? 0) : todayTotal}
-            {!setActive && (
-              <span className="session-panel__count-goal">/{dailyGoal}</span>
-            )}
-          </strong>
-          <div className="session-panel__chips">
-            <span className="session-chip">{setsDoneToday} sets</span>
-            <span className="session-chip">{Math.max(0, repsRemaining)} left</span>
+        {/* Left col: stats + progress + feedback */}
+        <div className="session-panel__left">
+          <div className="session-panel__hero">
+            <p className="eyebrow">{setActive ? 'This set' : 'Today'}</p>
+            <strong className="session-panel__count">
+              {setActive ? (currentSet?.reps ?? 0) : todayTotal}
+              {!setActive && (
+                <span className="session-panel__count-goal">/{dailyGoal}</span>
+              )}
+            </strong>
+            <div className="session-panel__chips">
+              <span className="session-chip">{setsDoneToday} sets</span>
+              <span className="session-chip">{Math.max(0, repsRemaining)} left</span>
+            </div>
           </div>
-        </div>
 
-        {/* Rep progress */}
-        <div className="session-panel__progress">
-          <span className="session-panel__phase">
-            {setActive ? PHASE_LABELS[viewState.phase] : 'Ready'}
-          </span>
-          <div className="rep-track">
-            <span
-              className="rep-track__fill"
-              style={{ width: `${Math.round(viewState.repProgress * 100)}%` }}
-            />
-          </div>
-          {viewState.calibrationActive && (
-            <div className="rep-track rep-track--calibrate" style={{ marginTop: '5px' }}>
+          <div className="session-panel__progress">
+            <span className="session-panel__phase">
+              {setActive ? PHASE_LABELS[viewState.phase] : 'Ready'}
+            </span>
+            <div className="rep-track">
               <span
                 className="rep-track__fill"
-                style={{ width: `${Math.round(viewState.calibrationProgress * 100)}%` }}
+                style={{ width: `${Math.round(viewState.repProgress * 100)}%` }}
               />
             </div>
-          )}
+            {viewState.calibrationActive && (
+              <div className="rep-track rep-track--calibrate" style={{ marginTop: '5px' }}>
+                <span
+                  className="rep-track__fill"
+                  style={{ width: `${Math.round(viewState.calibrationProgress * 100)}%` }}
+                />
+              </div>
+            )}
+          </div>
+
+          <div className="session-panel__feedback">
+            {viewState.errorMessage ? (
+              <p className="session-panel__msg session-panel__msg--error">
+                {viewState.errorMessage}
+              </p>
+            ) : !setActive && savedSessionInsight ? (
+              <div className="session-recap" aria-live="polite">
+                <span className="eyebrow">Set saved</span>
+                <strong className="session-recap__summary">
+                  {savedSessionInsight.reps} reps &middot; {formatAnalysisScore(savedSessionInsight.avgQualityScore)}
+                </strong>
+                <p className="session-recap__note">{getFormTakeaway(savedSessionInsight)}</p>
+              </div>
+            ) : viewState.status !== 'ready' && viewState.guidance ? (
+              <p className="session-panel__msg">{viewState.guidance}</p>
+            ) : null}
+          </div>
+
+          <div className="session-panel__spacer" />
         </div>
 
-        {/* Feedback / recap */}
-        <div className="session-panel__feedback">
-          {viewState.errorMessage ? (
-            <p className="session-panel__msg session-panel__msg--error">
-              {viewState.errorMessage}
-            </p>
-          ) : !setActive && savedSessionInsight ? (
-            <div className="session-recap" aria-live="polite">
-              <span className="eyebrow">Set saved</span>
-              <strong className="session-recap__summary">
-                {savedSessionInsight.reps} reps &middot; {formatAnalysisScore(savedSessionInsight.avgQualityScore)}
-              </strong>
-              <p className="session-recap__note">{getFormTakeaway(savedSessionInsight)}</p>
+        {/* Right col: action buttons */}
+        <div className="session-panel__right">
+          <div className="session-panel__spacer" />
+
+          <div className="session-panel__actions">
+            {setActive ? (
+              <button className="session-cta session-cta--save" type="button" onClick={onEndSet}>
+                Save set
+              </button>
+            ) : (
+              <button className="session-cta" type="button" onClick={onStartWorkout}>
+                Start set
+              </button>
+            )}
+            <div className="session-nudge">
+              <button
+                className="session-nudge__btn"
+                type="button"
+                onClick={() => onAdjustSet(1)}
+                disabled={!setActive}
+              >
+                +1
+              </button>
+              <button
+                className="session-nudge__btn"
+                type="button"
+                onClick={() => onAdjustSet(-1)}
+                disabled={!setActive}
+              >
+                &minus;1
+              </button>
             </div>
-          ) : viewState.status !== 'ready' && viewState.guidance ? (
-            <p className="session-panel__msg">{viewState.guidance}</p>
-          ) : null}
-        </div>
+          </div>
 
-        {/* Push actions to bottom */}
-        <div className="session-panel__spacer" />
-
-        {/* Primary action + corrections */}
-        <div className="session-panel__actions">
-          {setActive ? (
-            <button className="session-cta session-cta--save" type="button" onClick={onEndSet}>
-              Save set
+          <div className="session-cam-row">
+            <button className="session-cam-btn" type="button" onClick={onToggleCamera}>
+              {viewState.isCameraRunning ? 'Stop' : 'Start camera'}
             </button>
-          ) : (
-            <button className="session-cta" type="button" onClick={onStartWorkout}>
-              Start set
-            </button>
-          )}
-          <div className="session-nudge">
-            <button
-              className="session-nudge__btn"
-              type="button"
-              onClick={() => onAdjustSet(1)}
-              disabled={!setActive}
-            >
-              +1
-            </button>
-            <button
-              className="session-nudge__btn"
-              type="button"
-              onClick={() => onAdjustSet(-1)}
-              disabled={!setActive}
-            >
-              &minus;1
+            <button className="session-cam-btn" type="button" onClick={onFlipCamera}>
+              Flip
             </button>
           </div>
-        </div>
-
-        {/* Camera controls */}
-        <div className="session-cam-row">
-          <button className="session-cam-btn" type="button" onClick={onToggleCamera}>
-            {viewState.isCameraRunning ? 'Stop' : 'Start camera'}
-          </button>
-          <button className="session-cam-btn" type="button" onClick={onFlipCamera}>
-            Flip
-          </button>
         </div>
 
       </aside>
